@@ -13,7 +13,7 @@ import org.icatproject.topcat.Properties;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import javax.json.*;
+import jakarta.json.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

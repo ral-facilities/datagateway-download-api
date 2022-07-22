@@ -6,8 +6,8 @@ import java.lang.reflect.*;
 import static org.junit.Assert.*;
 import org.junit.*;
 
-import javax.json.*;
-import javax.ejb.EJB;
+import jakarta.json.*;
+import jakarta.ejb.EJB;
 
 import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.domain.*;

@@ -13,11 +13,11 @@ import org.jboss.shrinkwrap.api.spec.JavaArchive;
 import static org.junit.Assert.*;
 import org.junit.*;
 import org.junit.runner.RunWith;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
-import javax.json.*;
-import javax.ws.rs.core.Response;
-import javax.ejb.EJB;
+import jakarta.json.*;
+import jakarta.ws.rs.core.Response;
+import jakarta.ejb.EJB;
 
 import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.domain.*;

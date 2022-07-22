@@ -4,8 +4,8 @@ import java.io.Serializable;
 import java.lang.Boolean;
 import java.lang.Long;
 import java.lang.String;
-import javax.persistence.*;
-import javax.xml.bind.annotation.XmlRootElement;
+import jakarta.persistence.*;
+import jakarta.xml.bind.annotation.XmlRootElement;
 
 import org.eclipse.persistence.annotations.CascadeOnDelete;
 

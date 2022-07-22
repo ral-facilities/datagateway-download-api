@@ -17,11 +17,11 @@ import org.jboss.arquillian.transaction.api.annotation.Transactional;
 import static org.junit.Assert.*;
 import org.junit.*;
 import org.junit.runner.RunWith;
-import javax.inject.Inject;
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
-import javax.persistence.TypedQuery;
-import javax.ejb.EJB;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
+import jakarta.ejb.EJB;
 
 import org.icatproject.topcat.domain.*;
 import org.icatproject.topcat.exceptions.NotFoundException;

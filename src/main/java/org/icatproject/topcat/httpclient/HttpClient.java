@@ -3,8 +3,8 @@ package org.icatproject.topcat.httpclient;
 import java.util.Map;
 import java.util.HashMap;
 
-import javax.json.Json;
-import javax.json.JsonValue;
+import jakarta.json.Json;
+import jakarta.json.JsonValue;
 
 import java.net.URL;
 import java.net.URLEncoder;

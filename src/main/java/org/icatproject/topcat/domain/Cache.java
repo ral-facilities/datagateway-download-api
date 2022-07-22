@@ -3,8 +3,8 @@ package org.icatproject.topcat.domain;
 import java.io.*;
 import java.util.*;
 
-import javax.persistence.*;
-import javax.xml.bind.annotation.XmlRootElement;
+import jakarta.persistence.*;
+import jakarta.xml.bind.annotation.XmlRootElement;
 
 @Entity
 @Table(name = "CACHE")

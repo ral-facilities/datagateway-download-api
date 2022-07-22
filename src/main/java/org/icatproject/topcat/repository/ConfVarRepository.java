@@ -2,12 +2,12 @@ package org.icatproject.topcat.repository;
 
 import java.util.List;
 
-import javax.ejb.LocalBean;
-import javax.ejb.Singleton;
-import javax.ejb.Stateless;
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
-import javax.persistence.TypedQuery;
+import jakarta.ejb.LocalBean;
+import jakarta.ejb.Singleton;
+import jakarta.ejb.Stateless;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
 
 import org.icatproject.topcat.domain.ConfVar;
 import org.slf4j.Logger;

@@ -2,7 +2,7 @@ package org.icatproject.topcat;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import javax.json.*;
+import jakarta.json.*;
 import java.net.URLDecoder;
 import java.util.Map;
 import java.util.HashMap;

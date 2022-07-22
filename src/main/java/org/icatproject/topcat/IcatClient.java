@@ -11,7 +11,7 @@ import org.icatproject.topcat.httpclient.*;
 import org.icatproject.topcat.exceptions.*;
 import org.icatproject.topcat.domain.*;
 
-import javax.json.*;
+import jakarta.json.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

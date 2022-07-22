@@ -1,6 +1,6 @@
 package org.icatproject.topcat.domain;
 
-import javax.xml.bind.annotation.XmlRootElement;
+import jakarta.xml.bind.annotation.XmlRootElement;
 
 @XmlRootElement
 public enum Status {
