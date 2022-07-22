@@ -242,8 +242,8 @@
 			<dependencies>
 				<dependency>
 					<groupId>org.jboss.arquillian.container</groupId>
-					<artifactId>arquillian-glassfish-embedded-3.1</artifactId>
-					<version>1.0.0.CR3</version>
+					<artifactId>arquillian-glassfish-managed-6</artifactId>
+					<version>1.0.0.Alpha1</version>
 					<scope>test</scope>
 				</dependency>
 				<dependency>
