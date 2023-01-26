@@ -3,11 +3,11 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>org.icatproject</groupId>
-	<artifactId>topcat</artifactId>
+	<artifactId>datagateway-download-api</artifactId>
 	<packaging>war</packaging>
 	<version>2.4.10-SNAPSHOT</version>
-	<name>TopCAT</name>
-	<description>Web frontend for multiple ICATs</description>
+	<name>DataGateway Download API</name>
+	<description>Download backend for DataGateway</description>
 
 	<build>
 
@@ -317,15 +317,15 @@
 	</pluginRepositories>
 
 	<scm>
-		<connection>scm:git:https://github.com/icatproject/topcat.git</connection>
-		<developerConnection>scm:git:https://github.com/icatproject/topcat.git</developerConnection>
-		<url>https://github.com/icatproject/topcat</url>
+		<connection>scm:git:https://github.com/ral-facilities/datagateway-download-api.git</connection>
+		<developerConnection>scm:git:https://github.com/ral-facilities/datagateway-download-api.git</developerConnection>
+		<url>https://github.com/ral-facilities/datagateway-download-api</url>
 		<tag>HEAD</tag>
 	</scm>
 
 
 	<issueManagement>
-		<url>https://github.com/icatproject/topcat/issues</url>
+		<url>https://github.com/ral-facilities/datagateway-download-api/issues</url>
 		<system>GitHub</system>
 	</issueManagement>
 
@@ -345,7 +345,7 @@
 		<downloadUrl>https://repo.icatproject.org/repo</downloadUrl>
 		<site>
 			<id>repo.icatproject.org</id>
-			<url>dav:https://repo.icatproject.org/site/topcat/${project.version}</url>
+			<url>dav:https://repo.icatproject.org/site/datagateway-download-api/${project.version}</url>
 		</site>
 		<repository>
 			<id>repo.icatproject.org</id>
