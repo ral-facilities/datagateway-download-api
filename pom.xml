@@ -91,6 +91,31 @@
 				</dependencies>
 			</plugin>
 			<plugin>
+				<groupId>com.qmino</groupId>
+				<artifactId>miredot-plugin</artifactId>
+				<version>2.1.2</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>restdoc</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<licence>cHJvamVjdHxvcmcuaWNhdHByb2plY3QudG9wY2F0fDIwMjYtMDUtMTh8ZmFsc2V8LTEjTUN3Q0ZFRERHS042anNQVUZpOW80Wjdvc2VsVU50djBBaFFvd3lOU0UzWURiSHJmQVluZ0tpeWltbXl3QkE9PQ==</licence>
+					<output>
+						<html>
+							<location>site/miredot</location>
+							<baseUrl>https://example.com/topcat</baseUrl>
+						</html>
+					</output>
+					<!-- apply for spring mvc support <restModel> <restFramework> <name>spring-mvc</name> 
+						</restFramework> </restModel> -->
+					<!-- insert other configuration here (optional) -->
+				</configuration>
+			</plugin>
+
+	        <plugin>
 			    <groupId>org.apache.cxf</groupId>
 			    <artifactId>cxf-codegen-plugin</artifactId>
 			    <version>3.1.11</version>
@@ -282,6 +307,14 @@
 			<url>https://repo.icatproject.org/repo</url>
 		</repository>
 	</repositories>
+
+	<pluginRepositories>
+		<pluginRepository>
+			<id>miredot</id>
+			<name>MireDot Releases</name>
+			<url>https://secure-nexus.miredot.com/content/repositories/miredot</url>
+		</pluginRepository>
+	</pluginRepositories>
 
 	<scm>
 		<connection>scm:git:https://github.com/ral-facilities/datagateway-download-api.git</connection>
