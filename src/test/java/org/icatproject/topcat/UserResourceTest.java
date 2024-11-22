@@ -21,6 +21,8 @@ import jakarta.ejb.EJB;
 
 import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.domain.*;
+import org.icatproject.topcat.exceptions.ForbiddenException;
+
 import java.net.URLEncoder;
 
 import org.icatproject.topcat.repository.CacheRepository;
@@ -253,6 +255,31 @@ public class UserResourceTest {
 
 		newDownload = findDownload(downloads, downloadId);
 		assertTrue(newDownload.getIsDeleted());
+	}
+
+	@Test
+	public void testSetDownloadStatus() throws Exception {
+		Download testDownload = new Download();
+		String facilityName = "LILS";
+		testDownload.setFacilityName(facilityName);
+		testDownload.setSessionId(sessionId);
+		testDownload.setStatus(DownloadStatus.PAUSED);
+		testDownload.setIsDeleted(false);
+		testDownload.setUserName("simple/root");
+		testDownload.setFileName("testFile.txt");
+		testDownload.setTransport("http");
+		downloadRepository.save(testDownload);
+
+		assertThrows("Cannot modify status of a queued download", ForbiddenException.class, () -> {
+			userResource.setDownloadStatus(testDownload.getId(), facilityName, sessionId, DownloadStatus.RESTORING.toString());
+		});
+
+		Response response = userResource.getDownloads(facilityName, sessionId, "1 = 1");
+		assertEquals(200, response.getStatus());
+		List<Download> downloads = (List<Download>) response.getEntity();
+
+		Download unmodifiedDownload = findDownload(downloads, testDownload.getId());
+		assertEquals(DownloadStatus.PAUSED, unmodifiedDownload.getStatus());
 	}
 
 	@Test

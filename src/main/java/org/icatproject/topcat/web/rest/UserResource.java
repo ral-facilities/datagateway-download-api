@@ -260,6 +260,9 @@ public class UserResource {
 		if (!download.getUserName().equals(cartUserName)) {
 			throw new ForbiddenException("you do not have permission to delete this download");
 		}
+        if (download.getPreparedId() == null && download.getStatus().equals(DownloadStatus.PAUSED)) {
+            throw new ForbiddenException("Cannot modify status of a queued download");
+        }
 
         download.setStatus(DownloadStatus.valueOf(value));
         if(value.equals("COMPLETE")){
