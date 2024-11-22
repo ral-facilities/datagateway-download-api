@@ -237,6 +237,30 @@ public class AdminResourceTest {
 	}
 
 	@Test
+	public void testSetDownloadStatus() throws Exception {
+		Download testDownload = new Download();
+		String facilityName = "LILS";
+		testDownload.setFacilityName(facilityName);
+		testDownload.setSessionId(adminSessionId);
+		testDownload.setStatus(DownloadStatus.PAUSED);
+		testDownload.setIsDeleted(false);
+		testDownload.setUserName("simple/root");
+		testDownload.setFileName("testFile.txt");
+		testDownload.setTransport("http");
+		downloadRepository.save(testDownload);
+
+		Response response = adminResource.setDownloadStatus(testDownload.getId(), facilityName, adminSessionId, DownloadStatus.RESTORING.toString());
+		assertEquals(200, response.getStatus());
+
+		response = adminResource.getDownloads(facilityName, adminSessionId, "1 = 1");
+		assertEquals(200, response.getStatus());
+		List<Download> downloads = (List<Download>) response.getEntity();
+
+		testDownload = findDownload(downloads, testDownload.getId());
+		assertEquals(DownloadStatus.PREPARING, testDownload.getStatus());
+	}
+
+	@Test
 	public void testSetDownloadTypeStatus() throws Exception {
 
 		String facilityName = "LILS";
