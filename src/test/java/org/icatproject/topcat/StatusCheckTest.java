@@ -5,6 +5,8 @@ import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.junit.Arquillian;
@@ -38,14 +40,14 @@ public class StatusCheckTest {
 	EntityManager em;
 
 	@Deployment
-    public static JavaArchive createDeployment() {
-        return ShrinkWrap.create(JavaArchive.class)
-            .addClasses(StatusCheck.class, DownloadRepository.class, IdsClient.class)
-            .addPackages(true,"org.icatproject.topcat.domain","org.icatproject.topcat.exceptions")
-            .addAsResource("META-INF/persistence.xml")
-            .addAsManifestResource(EmptyAsset.INSTANCE, "beans.xml");
-    }
-    
+	public static JavaArchive createDeployment() {
+		return ShrinkWrap.create(JavaArchive.class)
+			.addClasses(StatusCheck.class, DownloadRepository.class, IdsClient.class)
+			.addPackages(true,"org.icatproject.topcat.domain","org.icatproject.topcat.exceptions")
+			.addAsResource("META-INF/persistence.xml")
+			.addAsManifestResource(EmptyAsset.INSTANCE, "beans.xml");
+	}
+	
 	// StatusCheck treats TopcatExceptions differently to all other Exceptions,
 	// so need to test both cases.  However, the only IdsClient method used by StatusCheck
 	// that can throw anything other than a TopcatException is isPrepared;
@@ -53,82 +55,82 @@ public class StatusCheckTest {
 	
 	public enum FailMode { OK, EXCEPTION, TOPCAT_EXCEPTION };
 	
-    private class MockIdsClient extends IdsClient {
-    	
-    	// Make size and preparedId available for tests
-    	
-    	public Long size = 26L;
-    	public String preparedId = "DummyPreparedId";
-    	
-    	private boolean isPreparedValue;
-    	private FailMode failMode;
-    	private boolean prepareDataCalledFlag;
-    	private boolean isPreparedCalledFlag;
-    	
-    	public MockIdsClient(String url) {
-    		// We are forced to do this as IdsClient has no no-args constructor;
-    		// This forces us to have the Properties defined, even though we won't use them.
-    		super(url);
-    		isPreparedValue = false;
-    		failMode = FailMode.OK;
-    		prepareDataCalledFlag = false;
-    		isPreparedCalledFlag = false;
-    	}
-    	
-    	// Mock overrides
-    	
-        public String prepareData(String sessionId, List<Long> investigationIds, List<Long> datasetIds, List<Long> datafileIds) throws TopcatException {
-        	prepareDataCalledFlag = true;
-        	if( failMode == FailMode.TOPCAT_EXCEPTION ) {
-        		throw new TopcatException(500,"Deliberate TopcatException for testing");
-        	}
-        	return preparedId;
-        }
-        
-        public boolean isPrepared(String preparedId) throws TopcatException, IOException {
-        	// This is the only IdsClient method used by StatusCheck that can throw anything other than a TopcatException
-        	isPreparedCalledFlag = true;
-        	if( failMode == FailMode.TOPCAT_EXCEPTION ) {
-        		throw new TopcatException(500,"Deliberate TopcatException for testing");
-        	} else if( failMode == FailMode.EXCEPTION ) {
-        		throw new IOException("Deliberate exception for testing");
-        	}
-        	return isPreparedValue;
-        }
+	private class MockIdsClient extends IdsClient {
+		
+		// Make size and preparedId available for tests
+		
+		public Long size = 26L;
+		public String preparedId = "DummyPreparedId";
+		
+		private boolean isPreparedValue;
+		private FailMode failMode;
+		private boolean prepareDataCalledFlag;
+		private boolean isPreparedCalledFlag;
+		
+		public MockIdsClient(String url) {
+			// We are forced to do this as IdsClient has no no-args constructor;
+			// This forces us to have the Properties defined, even though we won't use them.
+			super(url);
+			isPreparedValue = false;
+			failMode = FailMode.OK;
+			prepareDataCalledFlag = false;
+			isPreparedCalledFlag = false;
+		}
+		
+		// Mock overrides
+		
+		public String prepareData(String sessionId, List<Long> investigationIds, List<Long> datasetIds, List<Long> datafileIds) throws TopcatException {
+			prepareDataCalledFlag = true;
+			if( failMode == FailMode.TOPCAT_EXCEPTION ) {
+				throw new TopcatException(500,"Deliberate TopcatException for testing");
+			}
+			return preparedId;
+		}
+		
+		public boolean isPrepared(String preparedId) throws TopcatException, IOException {
+			// This is the only IdsClient method used by StatusCheck that can throw anything other than a TopcatException
+			isPreparedCalledFlag = true;
+			if( failMode == FailMode.TOPCAT_EXCEPTION ) {
+				throw new TopcatException(500,"Deliberate TopcatException for testing");
+			} else if( failMode == FailMode.EXCEPTION ) {
+				throw new IOException("Deliberate exception for testing");
+			}
+			return isPreparedValue;
+		}
 
-        public Long getSize(String sessionId, List<Long> investigationIds, List<Long> datasetIds, List<Long> datafileIds) throws TopcatException {
-        	if( failMode == FailMode.TOPCAT_EXCEPTION ) {
-        		throw new TopcatException(500,"Deliberate TopcatException for testing");
-        	}
-        	return size;
-        }
-        
-        // Mock utility methods
-        
-        public void setIsPrepared(Boolean aBool) {
-        	isPreparedValue = aBool;
-        }
-        
-        public void resetPrepareDataCalledFlag() {
-        	prepareDataCalledFlag = false;
-        }
-        
-        public void resetIsPreparedCalledFlag() {
-        	isPreparedCalledFlag = false;
-        }
-        
-        public void setFailMode(FailMode aFailMode) {
-        	failMode = aFailMode;
-        }
-        
-        public boolean prepareDataWasCalled() {
-        	return prepareDataCalledFlag;
-        }
+		public Long getSize(String sessionId, List<Long> investigationIds, List<Long> datasetIds, List<Long> datafileIds) throws TopcatException {
+			if( failMode == FailMode.TOPCAT_EXCEPTION ) {
+				throw new TopcatException(500,"Deliberate TopcatException for testing");
+			}
+			return size;
+		}
+		
+		// Mock utility methods
+		
+		public void setIsPrepared(Boolean aBool) {
+			isPreparedValue = aBool;
+		}
+		
+		public void resetPrepareDataCalledFlag() {
+			prepareDataCalledFlag = false;
+		}
+		
+		public void resetIsPreparedCalledFlag() {
+			isPreparedCalledFlag = false;
+		}
+		
+		public void setFailMode(FailMode aFailMode) {
+			failMode = aFailMode;
+		}
+		
+		public boolean prepareDataWasCalled() {
+			return prepareDataCalledFlag;
+		}
 
-        public boolean isPreparedWasCalled() {
-        	return isPreparedCalledFlag;
-        }
-    }
+		public boolean isPreparedWasCalled() {
+			return isPreparedCalledFlag;
+		}
+	}
 
 	@EJB
 	private DownloadRepository downloadRepository;
@@ -286,11 +288,11 @@ public class StatusCheckTest {
 		
 		postDownload = downloadRepository.getDownload(downloadId);
 		postDownload.setStatus(DownloadStatus.COMPLETE);
-        postDownload.setCompletedAt(new Date());
+		postDownload.setCompletedAt(new Date());
 
-        downloadRepository.save(postDownload);
+		downloadRepository.save(postDownload);
 
-        statusCheck.updateStatuses(pollDelay, pollIntervalWait, mockIdsClient);
+		statusCheck.updateStatuses(pollDelay, pollIntervalWait, mockIdsClient);
 		
 		// Download still be RESTORING, but download.email is null, so isEmailSent should still be false
 		
@@ -532,10 +534,10 @@ public class StatusCheckTest {
 		// Set the status and persist it
 		
 		dummyDownload.setStatus(status);
-        em.persist(dummyDownload);
-        em.flush();
-        
-        // Not testing delays, so set to zero
+		em.persist(dummyDownload);
+		em.flush();
+		
+		// Not testing delays, so set to zero
 
 		int pollDelay = 0;
 		int pollIntervalWait = 0;
@@ -572,10 +574,10 @@ public class StatusCheckTest {
 		// Set download deleted and persist it
 		
 		dummyDownload.setIsDeleted(true);
-        em.persist(dummyDownload);
-        em.flush();
-        
-        // Not testing delays, so set to zero
+		em.persist(dummyDownload);
+		em.flush();
+		
+		// Not testing delays, so set to zero
 
 		int pollDelay = 0;
 		int pollIntervalWait = 0;
@@ -718,8 +720,97 @@ public class StatusCheckTest {
 		// clean up
 		deleteDummyDownload(postDownload);
 	}
+
+	@Test
+	@Transactional
+	public void testStartQueuedDownloadsNegative() throws NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+		Method method = StatusCheck.class.getDeclaredMethod("startQueuedDownloads", int.class);
+		method.setAccessible(true);
+
+		String transport = "http";
+		Download dummyDownload1 = createDummyDownload(null, transport, true, DownloadStatus.PAUSED);
+		Download dummyDownload2 = createDummyDownload(null, transport, true, DownloadStatus.PAUSED);
+		Long downloadId1 = dummyDownload1.getId();
+		Long downloadId2 = dummyDownload2.getId();
+
+		method.invoke(statusCheck, -1);
+		
+		// All Downloads should have been prepared
+		
+		Download postDownload1 = getDummyDownload(downloadId1);
+		Download postDownload2 = getDummyDownload(downloadId2);
+		
+		assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
+		assertNotNull(postDownload1.getPreparedId());
+		assertEquals(DownloadStatus.RESTORING, postDownload2.getStatus());
+		assertNotNull(postDownload2.getPreparedId());
+		
+		// clean up
+		deleteDummyDownload(postDownload1);
+		deleteDummyDownload(postDownload2);
+	}
+
+	@Test
+	@Transactional
+	public void testStartQueuedDownloadsZero() throws NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+		Method method = StatusCheck.class.getDeclaredMethod("startQueuedDownloads", int.class);
+		method.setAccessible(true);
+
+		String transport = "http";
+		Download dummyDownload = createDummyDownload(null, transport, true, DownloadStatus.PAUSED);
+		Long downloadId = dummyDownload.getId();
+
+		method.invoke(statusCheck, 0);
+		
+		// Download status should still be PAUSED, as we unqueued a max of 0 downloads
+		
+		Download postDownload = getDummyDownload(downloadId);
+
+		assertEquals(DownloadStatus.PAUSED, postDownload.getStatus());
+		assertNull(postDownload.getPreparedId());
+		
+		// clean up
+		deleteDummyDownload(postDownload);
+	}
+
+	@Test
+	@Transactional
+	public void testStartQueuedDownloadsNonZero() throws NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+		Method method = StatusCheck.class.getDeclaredMethod("startQueuedDownloads", int.class);
+		method.setAccessible(true);
+
+		String transport = "http";
+		Download dummyDownload1 = createDummyDownload("preparedId", transport, true, DownloadStatus.RESTORING);
+		Download dummyDownload2 = createDummyDownload(null, transport, true, DownloadStatus.PAUSED);
+		Long downloadId1 = dummyDownload1.getId();
+		Long downloadId2 = dummyDownload2.getId();
+
+		method.invoke(statusCheck, 1);
+		
+		// Should not schedule the second Download, as we already have 1 which is RESTORING
+		
+		Download postDownload1 = getDummyDownload(downloadId1);
+		Download postDownload2 = getDummyDownload(downloadId2);
+		
+		assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
+		assertNotNull(postDownload1.getPreparedId());
+		assertEquals(DownloadStatus.PAUSED, postDownload2.getStatus());
+		assertNull(postDownload2.getPreparedId());
+		
+		// clean up
+		deleteDummyDownload(postDownload1);
+		deleteDummyDownload(postDownload2);
+	}
 	
 	private Download createDummyDownload(String preparedId, String transport, Boolean isTwoLevel) {
+		if(isTwoLevel){
+			return createDummyDownload(preparedId, transport, isTwoLevel, DownloadStatus.PREPARING);
+		} else {
+			return createDummyDownload(preparedId, transport, isTwoLevel, DownloadStatus.COMPLETE);
+		}
+	}
+
+	private Download createDummyDownload(String preparedId, String transport, Boolean isTwoLevel, DownloadStatus downloadStatus) {
 		
 		// This mocks what UserResource.submitCart() might do.
 		
@@ -759,10 +850,10 @@ public class StatusCheckTest {
 		download.setIsTwoLevel(isTwoLevel);
 
 		if(isTwoLevel){
-			download.setStatus(DownloadStatus.PREPARING);
+			download.setStatus(downloadStatus);
 		} else {
 	   		download.setPreparedId(preparedId);
-			download.setStatus(DownloadStatus.COMPLETE);
+			download.setStatus(downloadStatus);
 		}
 
 		em.persist(download);

@@ -84,3 +84,8 @@ maxCacheSize=100000
 
 # Username that corresponds with the anonymous user - this is used to make anonymous carts unique
 anonUserName=anon/anon
+
+# Limit the number maximum of active RESTORING downloads. Does not affect user submitted carts,
+# but queued requests will only be started when there are less than this many RESTORING downloads.
+# Negative values will start all queued jobs immediately, regardless of load.
+queue.maxActiveDownloads = 10
