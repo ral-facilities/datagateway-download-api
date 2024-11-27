@@ -88,10 +88,9 @@ public class UserResourceTest {
 	public void testGetSize() throws Exception {
 		String facilityName = "LILS";
 		String entityType = "investigation";
-		Long entityId = (long) 1;
 		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
-
-		List<Long> emptyIds = new ArrayList<Long>();
+		JsonObject investigation = icatClient.getEntity(entityType);
+		long entityId = investigation.getInt("id");
 
 		Response response = userResource.getSize(facilityName, sessionId, entityType, entityId);
 
@@ -105,6 +104,9 @@ public class UserResourceTest {
 	@Test
 	public void testCart() throws Exception {
 		String facilityName = "LILS";
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		JsonObject dataset = icatClient.getEntity("dataset");
+		long entityId = dataset.getInt("id");
 
 		Response response;
 
@@ -127,7 +129,7 @@ public class UserResourceTest {
 		// We assume that there is a dataset with id = 1, and that simple/root can see
 		// it.
 
-		response = userResource.addCartItems(facilityName, sessionId, "dataset 1", false);
+		response = userResource.addCartItems(facilityName, sessionId, "dataset " + entityId, false);
 		assertEquals(200, response.getStatus());
 
 		response = userResource.getCart(facilityName, sessionId);
@@ -138,7 +140,7 @@ public class UserResourceTest {
 		// Again, this ought to be done directly, rather than using the methods we
 		// should be testing independently!
 
-		response = userResource.deleteCartItems(facilityName, sessionId, "dataset 1");
+		response = userResource.deleteCartItems(facilityName, sessionId, "dataset " + entityId);
 		assertEquals(200, response.getStatus());
 		assertEquals(0, getCartSize(response));
 	}
@@ -149,6 +151,9 @@ public class UserResourceTest {
 		Response response;
 		JsonObject json;
 		List<Download> downloads;
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		JsonObject dataset = icatClient.getEntity("dataset");
+		long entityId = dataset.getInt("id");
 
 		// Get the initial state of the downloads - may not be empty
 		// It appears queryOffset cannot be empty!
@@ -163,7 +168,7 @@ public class UserResourceTest {
 		System.out.println("DEBUG testSubmitCart: initial downloads size: " + initialDownloadsSize);
 
 		// Put something into the Cart, so we have something to submit
-		response = userResource.addCartItems(facilityName, sessionId, "dataset 1", false);
+		response = userResource.addCartItems(facilityName, sessionId, "dataset " + entityId, false);
 		assertEquals(200, response.getStatus());
 
 		// Now submit it
@@ -318,7 +323,7 @@ public class UserResourceTest {
 	private Download findDownload(List<Download> downloads, Long downloadId) {
 
 		for (Download download : downloads) {
-			if (download.getId() == downloadId)
+			if (download.getId().equals(downloadId))
 				return download;
 		}
 		return null;
