@@ -244,12 +244,6 @@
 						<artifactId>maven-surefire-plugin</artifactId>
 						<version>2.19.1</version>
 						<configuration>
-							<excludes>
-								<!-- Requires an arquillian-persistence implementation compatible with the jakarta namespace. -->
-								<exclude>**/StatusCheckTest.java</exclude>
-							</excludes>
-							<!-- TODO remove next line -->
-							<!-- <skipTests>true</skipTests> -->
 							<argLine>-Xmx768m -XX:MaxMetaspaceSize=256m</argLine>
 							<systemPropertyVariables>
 								<java.util.logging.config.file>

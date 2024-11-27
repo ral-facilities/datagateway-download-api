@@ -278,8 +278,11 @@ public class StatusCheck {
    * @param maxActiveDownloads Limit on the number of concurrent jobs with RESTORING status
    * @throws Exception
    */
-  private void startQueuedDownloads(int maxActiveDownloads) throws Exception {
-    if (maxActiveDownloads == 0) { return; }
+  public void startQueuedDownloads(int maxActiveDownloads) throws Exception {
+    if (maxActiveDownloads == 0) {
+      return;
+    }
+
     String selectString = "select download from Download download where download.isDeleted != true";
     String restoringCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.RESTORING";
     String pausedCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.PAUSED";
@@ -288,7 +291,7 @@ public class StatusCheck {
     TypedQuery<Download> activeDownloadsQuery = em.createQuery(activeQueryString, Download.class);
     List<Download> activeDownloads = activeDownloadsQuery.getResultList();
 
-    String queuedQueryString = selectString + " and " + pausedCondition + " and download.preparedId == null";
+    String queuedQueryString = selectString + " and " + pausedCondition + " and download.preparedId = null";
     if (maxActiveDownloads > 0) {
       int freeActiveDownloads = maxActiveDownloads - activeDownloads.size();
       if (freeActiveDownloads <= 0) {
