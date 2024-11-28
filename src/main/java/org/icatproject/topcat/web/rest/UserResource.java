@@ -84,6 +84,24 @@ public class UserResource {
 	}
 
 	/**
+	 * Login to create a session
+	 * 
+	 * @param facilityName a facility name - properties must map this to a url to a valid ICAT REST api.
+	 * @param jsonString   with plugin and credentials which takes the form
+	 *                     <code>{"plugin":"db", "credentials:[{"username":"root"}, {"password":"guess"}]}</code>
+	 * @return json with sessionId of the form
+	 *         <samp>{"sessionId","0d9a3706-80d4-4d29-9ff3-4d65d4308a24"}</samp>
+	 * @throws BadRequestException
+	 */
+	@POST
+	@Path("/session")
+	public String login(@QueryParam("facilityName") String facilityName, @FormParam("json") String jsonString) throws BadRequestException {
+		String icatUrl = getIcatUrl(facilityName);
+		IcatClient icatClient = new IcatClient(icatUrl);
+		return icatClient.login(jsonString);
+	}
+
+	/**
 	 * Returns a list of downloads associated with a particular sessionId
 	 * filtered by a partial JPQL expression.
 	 *
