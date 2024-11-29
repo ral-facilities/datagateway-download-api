@@ -84,3 +84,8 @@ maxCacheSize=100000
 
 # Username that corresponds with the anonymous user - this is used to make anonymous carts unique
 anonUserName=anon/anon
+
+# Limit the number files per queued Download part. Multiple Datasets will be combined into part
+# Downloads based on their fileCount up to this limit. If a single Dataset has a fileCount
+# greater than this limit, it will still be submitted in a part by itself.
+queue.maxFileCount = 10000

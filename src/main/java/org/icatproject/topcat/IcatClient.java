@@ -93,6 +93,65 @@ public class IcatClient {
     	}
 	}
 
+	/**
+	 * Get all Datasets whose parent Investigation has the specified visitId.
+	 * 
+	 * @param visitId ICAT Investigation.visitId
+	 * @return JsonArray of Datasets, where each entry is a JsonArray of
+	 *         [dataset.id, dataset.fileCount].
+	 * @throws TopcatException
+	 */
+	public JsonArray getDatasets(String visitId) throws TopcatException {
+		try {
+			String query = "SELECT dataset.id, dataset.fileCount from Dataset dataset";
+			query += " WHERE dataset.investigation.visitId = '" + visitId + "' ORDER BY dataset.id";
+			String encodedQuery = URLEncoder.encode(query, "UTF8");
+
+			String url = "entityManager?sessionId=" + URLEncoder.encode(sessionId, "UTF8") + "&query=" + encodedQuery;
+			Response response = httpClient.get(url, new HashMap<String, String>());
+			if (response.getCode() == 404) {
+				throw new NotFoundException("Could not run getEntities got a 404 response");
+			} else if (response.getCode() >= 400) {
+				throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
+			}
+			return Utils.parseJsonArray(response.toString());
+		} catch (TopcatException e) {
+            throw e;
+		} catch (Exception e) {
+			throw new BadRequestException(e.getMessage());
+		}
+	}
+
+	/**
+	 * Utility method to get the fileCount (not size) of a Dataset by COUNT of its
+	 * child Datafiles. Ideally the fileCount field should be used, this is a
+	 * fallback option if that field is not set.
+	 * 
+	 * @param datasetId ICAT Dataset.id
+	 * @return The number of Datafiles in the specified Dataset
+	 * @throws TopcatException
+	 */
+	public long getDatasetFileCount(long datasetId) throws TopcatException {
+		try {
+			String query = "SELECT COUNT(datafile) FROM Datafile datafile WHERE datafile.dataset.id = " + datasetId;
+			String encodedQuery = URLEncoder.encode(query, "UTF8");
+
+			String url = "entityManager?sessionId=" + URLEncoder.encode(sessionId, "UTF8") + "&query=" + encodedQuery;
+			Response response = httpClient.get(url, new HashMap<String, String>());
+			if (response.getCode() == 404) {
+				throw new NotFoundException("Could not run getEntities got a 404 response");
+			} else if (response.getCode() >= 400) {
+				throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
+			}
+			JsonArray jsonArray = Utils.parseJsonArray(response.toString());
+			return jsonArray.getJsonNumber(0).longValueExact();
+		} catch (TopcatException e) {
+            throw e;
+		} catch (Exception e) {
+			throw new BadRequestException(e.getMessage());
+		}
+	}
+
 	public List<JsonObject> getEntities(String entityType, List<Long> entityIds) throws TopcatException {
 		List<JsonObject> out = new ArrayList<JsonObject>();
 		try {
