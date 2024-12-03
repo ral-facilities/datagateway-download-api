@@ -97,29 +97,35 @@ public class IcatClient {
 	 * Get all Datasets whose parent Investigation has the specified visitId.
 	 * 
 	 * @param visitId ICAT Investigation.visitId
-	 * @return JsonArray of Datasets, where each entry is a JsonArray of
+	 * @return JsonArray of Dataset fields, where each entry is a JsonArray of
 	 *         [dataset.id, dataset.fileCount].
 	 * @throws TopcatException
 	 */
 	public JsonArray getDatasets(String visitId) throws TopcatException {
-		try {
 			String query = "SELECT dataset.id, dataset.fileCount from Dataset dataset";
 			query += " WHERE dataset.investigation.visitId = '" + visitId + "' ORDER BY dataset.id";
-			String encodedQuery = URLEncoder.encode(query, "UTF8");
+		return submitQuery(query);
+	}
 
-			String url = "entityManager?sessionId=" + URLEncoder.encode(sessionId, "UTF8") + "&query=" + encodedQuery;
-			Response response = httpClient.get(url, new HashMap<String, String>());
-			if (response.getCode() == 404) {
-				throw new NotFoundException("Could not run getEntities got a 404 response");
-			} else if (response.getCode() >= 400) {
-				throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
-			}
-			return Utils.parseJsonArray(response.toString());
-		} catch (TopcatException e) {
-            throw e;
-		} catch (Exception e) {
-			throw new BadRequestException(e.getMessage());
-		}
+	/**
+	 * Get all Datafiles in the list of file locations.
+	 * 
+	 * @param files List of ICAT Datafile.locations
+	 * @return JsonArray of Datafile ids.
+	 * @throws TopcatException
+	 */
+	public JsonArray getDatafiles(List<String> files) throws TopcatException {
+		StringBuilder stringBuilder = new StringBuilder();
+		ListIterator<String> fileIterator = files.listIterator();
+		stringBuilder.append("'" + fileIterator.next() + "'");
+		fileIterator.forEachRemaining(file -> {
+			stringBuilder.append(",");
+			stringBuilder.append("'" + file + "'");
+		});
+		String formattedFiles = stringBuilder.toString();
+		String query = "SELECT datafile.id from Datafile datafile";
+		query += " WHERE datafile.location in (" + formattedFiles + ") ORDER BY datafile.id";
+		return submitQuery(query);
 	}
 
 	/**
@@ -132,10 +138,22 @@ public class IcatClient {
 	 * @throws TopcatException
 	 */
 	public long getDatasetFileCount(long datasetId) throws TopcatException {
-		try {
 			String query = "SELECT COUNT(datafile) FROM Datafile datafile WHERE datafile.dataset.id = " + datasetId;
-			String encodedQuery = URLEncoder.encode(query, "UTF8");
+		JsonArray jsonArray = submitQuery(query);
+		return jsonArray.getJsonNumber(0).longValueExact();
+	}
 
+	/**
+	 * Utility method for submitting an unformatted query to the entityManager
+	 * endpoint, and returning the resultant JsonArray.
+	 * 
+	 * @param query Unformatted String query to submit
+	 * @return JsonArray of results, contents will depend on the query.
+	 * @throws TopcatException
+	 */
+	private JsonArray submitQuery(String query) throws TopcatException {
+		try {
+			String encodedQuery = URLEncoder.encode(query, "UTF8");
 			String url = "entityManager?sessionId=" + URLEncoder.encode(sessionId, "UTF8") + "&query=" + encodedQuery;
 			Response response = httpClient.get(url, new HashMap<String, String>());
 			if (response.getCode() == 404) {
@@ -143,8 +161,7 @@ public class IcatClient {
 			} else if (response.getCode() >= 400) {
 				throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
 			}
-			JsonArray jsonArray = Utils.parseJsonArray(response.toString());
-			return jsonArray.getJsonNumber(0).longValueExact();
+			return Utils.parseJsonArray(response.toString());
 		} catch (TopcatException e) {
             throw e;
 		} catch (Exception e) {
