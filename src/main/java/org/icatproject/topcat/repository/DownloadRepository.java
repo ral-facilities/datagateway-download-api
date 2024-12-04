@@ -5,6 +5,7 @@ import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.text.DateFormat;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
@@ -21,7 +22,9 @@ import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 
 import org.icatproject.topcat.domain.Download;
+import org.icatproject.topcat.domain.DownloadStatus;
 import org.icatproject.topcat.exceptions.BadRequestException;
+import org.icatproject.topcat.exceptions.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,6 +98,38 @@ public class DownloadRepository {
 		}
 
 		return downloads;
+	}
+
+	/**
+	 * Get the statuses from downloadIds.
+	 * 
+	 * @param userName    The formatted userName corresponding to the sessionId that
+	 *                    submitted the request
+	 * @param downloadIds List of ids to check
+	 * @return List of DownloadStatus for each downloadId
+	 * @throws NotFoundException If less Downloads are found than ids provided. In
+	 *                           practice, this either means the Download(s) do not
+	 *                           exist or they did not belong to the user submitting
+	 *                           the request.
+	 */
+	public List<DownloadStatus> getStatuses(String userName, List<Long> downloadIds) throws NotFoundException {
+		StringBuilder stringBuilder = new StringBuilder();
+		Iterator<Long> downloadIdIterator = downloadIds.iterator();
+		stringBuilder.append(downloadIdIterator.next());
+		downloadIdIterator.forEachRemaining(downloadId -> {
+			stringBuilder.append(",");
+			stringBuilder.append(downloadId);
+		});
+		String queryString = "SELECT download.status FROM Download download WHERE download.userName = '" + userName;
+		queryString += "' AND download.id IN (" + stringBuilder.toString() + ")";
+		TypedQuery<DownloadStatus> query = em.createQuery(queryString, DownloadStatus.class);
+		List<DownloadStatus> resultList = query.getResultList();
+
+		if (resultList.size() < downloadIds.size()) {
+			throw new NotFoundException("Could not find a Download for each provided id");
+		}
+
+		return resultList;
 	}
 
 	public Download getDownload(Long id) {

@@ -154,6 +154,36 @@ public class UserResource {
 	}
 
 	/**
+	 * Get the statuses of one or more in progress Downloads.
+	 * 
+	 * @param facilityName ICAT Facility.name
+	 * @param sessionId    ICAT sessionId, only carts belonging to the ICAT user
+	 *                     this resolves to will be returned.
+	 * @param downloadIds  One or more ids for the Download(s) to check
+	 * @return Array of DownloadStatus values
+	 * @throws TopcatException
+	 * @throws MalformedURLException
+	 * @throws ParseException
+	 */
+	@GET
+	@Path("/downloads/status")
+	@Produces({ MediaType.APPLICATION_JSON })
+	public Response getDownloadStatuses(@QueryParam("facilityName") String facilityName,
+			@QueryParam("sessionId") String sessionId, @QueryParam("downloadIds") List<Long> downloadIds)
+			throws TopcatException, MalformedURLException, ParseException {
+
+		if (downloadIds.size() == 0) {
+			throw new BadRequestException("At least one downloadId required");
+		}
+		String icatUrl = getIcatUrl(facilityName);
+		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
+		String cartUserName = getCartUserName(icatClient.getUserName(), sessionId);
+		List<DownloadStatus> statuses = downloadRepository.getStatuses(cartUserName, downloadIds);
+
+		return Response.ok().entity(statuses).build();
+	}
+
+	/**
 	 * Sets whether or not a download is deleted associated with a particular
 	 * sessionId.
 	 *

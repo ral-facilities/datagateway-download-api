@@ -12,6 +12,7 @@ import org.jboss.shrinkwrap.api.spec.JavaArchive;
 
 import static org.junit.Assert.*;
 import org.junit.*;
+import org.junit.function.ThrowingRunnable;
 import org.junit.runner.RunWith;
 import jakarta.inject.Inject;
 
@@ -21,6 +22,11 @@ import jakarta.ejb.EJB;
 
 import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.domain.*;
+import org.icatproject.topcat.exceptions.BadRequestException;
+import org.icatproject.topcat.exceptions.NotFoundException;
+import org.icatproject.topcat.exceptions.TopcatException;
+
+import java.net.MalformedURLException;
 import java.net.URLEncoder;
 
 import org.icatproject.topcat.repository.CacheRepository;
@@ -30,6 +36,7 @@ import org.icatproject.topcat.repository.DownloadTypeRepository;
 import org.icatproject.topcat.web.rest.UserResource;
 
 import java.sql.*;
+import java.text.ParseException;
 
 @RunWith(Arquillian.class)
 public class UserResourceTest {
@@ -273,6 +280,56 @@ public class UserResourceTest {
 			String message = json.getString("message");
 		} catch (Exception e) {
 			fail("One or both fields are not of the correct type: " + e.getMessage());
+		}
+	}
+
+	@Test
+	public void testGetDownloadStatusesBadRequest() throws MalformedURLException, TopcatException, ParseException {
+		ThrowingRunnable runnable = () -> userResource.getDownloadStatuses("LILS", sessionId, new ArrayList<>());
+		assertThrows(BadRequestException.class, runnable);
+	}
+
+	@Test
+	public void testGetDownloadNotFound() throws MalformedURLException, TopcatException, ParseException {
+		List<Long> downloadIds = new ArrayList<>();
+		try {
+			Download download = new Download();
+			download.setFacilityName("LILS");
+			download.setUserName("simple/notroot");
+			download.setTransport("http");
+			download.setFileName("fileName");
+			download.setSessionId(sessionId);
+			download.setStatus(DownloadStatus.COMPLETE);
+			download = downloadRepository.save(download);
+			downloadIds.add(download.getId());
+			ThrowingRunnable runnable = () -> userResource.getDownloadStatuses("LILS", sessionId, downloadIds);
+			assertThrows(NotFoundException.class, runnable);
+		} finally {
+			downloadIds.forEach(downloadId -> {
+				downloadRepository.removeDownload(downloadId);
+			});
+		}
+	}
+
+	@Test
+	public void testGetDownloadStatuses() throws MalformedURLException, TopcatException, ParseException {
+		List<Long> downloadIds = new ArrayList<>();
+		try {
+			Download download = new Download();
+			download.setFacilityName("LILS");
+			download.setUserName("simple/root");
+			download.setTransport("http");
+			download.setFileName("fileName");
+			download.setSessionId(sessionId);
+			download.setStatus(DownloadStatus.COMPLETE);
+			download = downloadRepository.save(download);
+			downloadIds.add(download.getId());
+			Response response = userResource.getDownloadStatuses("LILS", sessionId, downloadIds);
+			assertEquals(Arrays.asList(DownloadStatus.COMPLETE), response.getEntity());
+		} finally {
+			downloadIds.forEach(downloadId -> {
+				downloadRepository.removeDownload(downloadId);
+			});
 		}
 	}
 
