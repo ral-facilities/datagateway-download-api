@@ -57,13 +57,14 @@ public class StatusCheck {
   @Resource(name = "mail/topcat")
   private Session mailSession;
   
-  @Schedule(hour="*", minute="*", second="*")
+  @Schedule(hour = "*", minute = "*", second = "*")
   private void poll() {
 	  
-	  // Observation: glassfish may already prevent multiple executions, and may even count the attempt as an error,
-	  // so it is possible that the use of a semaphore here is redundant.
+    // Observation: glassfish may already prevent multiple executions, and may even
+    // count the attempt as an error, so it is possible that the use of a semaphore
+    // here is redundant.
 	  
-    if(!busy.compareAndSet(false, true)){
+    if (!busy.compareAndSet(false, true)) {
       return;
     }
 
@@ -71,14 +72,16 @@ public class StatusCheck {
       Properties properties = Properties.getInstance();
       int pollDelay = Integer.valueOf(properties.getProperty("poll.delay", "600"));
       int pollIntervalWait = Integer.valueOf(properties.getProperty("poll.interval.wait", "600"));
+      int maxActiveDownloads = Integer.valueOf(properties.getProperty("queue.maxActiveDownloads", "0"));
 
       // For testing, separate out the poll body into its own method
       // And allow test configurations to disable scheduled status checks
-      if( ! Boolean.valueOf(properties.getProperty("test.disableDownloadStatusChecks","false"))) {
+      if (!Boolean.valueOf(properties.getProperty("test.disableDownloadStatusChecks", "false"))) {
           updateStatuses(pollDelay, pollIntervalWait, null);   	  
+        startQueuedDownloads(maxActiveDownloads);
       }
       
-    } catch(Exception e){
+    } catch (Exception e) {
       logger.error(e.getMessage());
     } finally {
       busy.set(false);
@@ -88,39 +91,50 @@ public class StatusCheck {
   /**
    * Update the status of each relevant download.
    * 
-   * @param pollDelay minimum time to wait before initial preparation/check
-   * @param pollIntervalWait minimum time between checks
+   * @param pollDelay         minimum time to wait before initial
+   *                          preparation/check
+   * @param pollIntervalWait  minimum time between checks
    * @param injectedIdsClient optional (possibly mock) IdsClient
    * @throws Exception
    */
   public void updateStatuses(int pollDelay, int pollIntervalWait, IdsClient injectedIdsClient) throws Exception {
 	  
-	  // This method is intended for testing, but we are forced to make it public rather than protected.
+    // This method is intended for testing, but we are forced to make it public
+    // rather than protected.
 
-	  TypedQuery<Download> query = em.createQuery("select download from Download download where download.isDeleted != true and download.status != org.icatproject.topcat.domain.DownloadStatus.EXPIRED and (download.status = org.icatproject.topcat.domain.DownloadStatus.PREPARING or (download.status = org.icatproject.topcat.domain.DownloadStatus.RESTORING and download.transport in ('https','http')) or (download.email != null and download.isEmailSent = false))", Download.class);
+    String selectString = "select download from Download download where download.isDeleted != true";
+    String notExpiredCondition = "download.status != org.icatproject.topcat.domain.DownloadStatus.EXPIRED";
+    String preparingCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.PREPARING";
+    String restoringHttpCondition = "(download.status = org.icatproject.topcat.domain.DownloadStatus.RESTORING and download.transport in ('https','http'))";
+    String notEmailSentCondition = "(download.email != null and download.isEmailSent = false)";
+    String isActiveCondition = preparingCondition + " or " + restoringHttpCondition + " or " + notEmailSentCondition;
+    String queryString = selectString + " and " + notExpiredCondition + " and (" + isActiveCondition + ")";
+
+    TypedQuery<Download> query = em.createQuery(queryString, Download.class);
       List<Download> downloads = query.getResultList();
 
-      for(Download download : downloads){
+    for (Download download : downloads) {
         Date lastCheck = lastChecks.get(download.getId());
         Date now = new Date();
         long createdSecondsAgo = (now.getTime() - download.getCreatedAt().getTime()) / 1000;
-        if(download.getStatus() == DownloadStatus.PREPARING){
-        	// If prepareDownload was called previously but caught an exception (other than TopcatException),
-        	// we should not call it again immediately, but should impose a delay. See issue #462.          
-          if(lastCheck == null){
+      if (download.getStatus() == DownloadStatus.PREPARING) {
+        // If prepareDownload was called previously but caught an exception (other than
+        // TopcatException), we should not call it again immediately, but should impose
+        // a delay. See issue #462.
+        if (lastCheck == null) {
         	  prepareDownload(download, injectedIdsClient);
             } else {
               long lastCheckSecondsAgo = (now.getTime() - lastCheck.getTime()) / 1000;
-              if(lastCheckSecondsAgo >= pollIntervalWait){
+          if (lastCheckSecondsAgo >= pollIntervalWait) {
             	  prepareDownload(download, injectedIdsClient);
               }
             }
-        } else if(createdSecondsAgo >= pollDelay){
-          if(lastCheck == null){
+      } else if (createdSecondsAgo >= pollDelay) {
+        if (lastCheck == null) {
             performCheck(download, injectedIdsClient);
           } else {
             long lastCheckSecondsAgo = (now.getTime() - lastCheck.getTime()) / 1000;
-            if(lastCheckSecondsAgo >= pollIntervalWait){
+          if (lastCheckSecondsAgo >= pollIntervalWait) {
               performCheck(download, injectedIdsClient);
             }
           }
@@ -258,8 +272,45 @@ public class StatusCheck {
 
   }
   
+  /**
+   * Prepares Downloads which are queued (PAUSED with no preparedId) up to the maxActiveDownloads limit.
+   * 
+   * @param maxActiveDownloads Limit on the number of concurrent jobs with RESTORING status
+   * @throws Exception
+   */
+  public void startQueuedDownloads(int maxActiveDownloads) throws Exception {
+    if (maxActiveDownloads == 0) {
+      return;
+    }
+
+    String selectString = "select download from Download download where download.isDeleted != true";
+    String restoringCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.RESTORING";
+    String pausedCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.PAUSED";
+
+    String activeQueryString = selectString + " and " + restoringCondition;
+    TypedQuery<Download> activeDownloadsQuery = em.createQuery(activeQueryString, Download.class);
+    List<Download> activeDownloads = activeDownloadsQuery.getResultList();
+
+    String queuedQueryString = selectString + " and " + pausedCondition + " and download.preparedId = null";
+    if (maxActiveDownloads > 0) {
+      int freeActiveDownloads = maxActiveDownloads - activeDownloads.size();
+      if (freeActiveDownloads <= 0) {
+        return;
+      }
+      queuedQueryString += " order by download.createdAt limit " + Integer.toString(freeActiveDownloads);
+    }
+
+    TypedQuery<Download> queuedDownloadsQuery = em.createQuery(queuedQueryString, Download.class);
+    List<Download> queuedDownloads = queuedDownloadsQuery.getResultList();
+    
+    for (Download queuedDownload : queuedDownloads) {
+      queuedDownload.setStatus(DownloadStatus.PREPARING);
+      prepareDownload(queuedDownload, null);
+    }
+  }
+
   private void handleException( Download download, String reason, boolean doExpire ) {
-	  if( doExpire ) {
+    if( doExpire ) {
 	      logger.error("Marking download " + download.getId() + " as expired. Reason: " + reason);
 	      download.setStatus(DownloadStatus.EXPIRED);
 	      em.persist(download);
