@@ -817,6 +817,7 @@ public class UserResource {
 		// If we wanted to block the user, this is where we would do it
 		String userName = icatClient.getUserName();
 		String fullName = icatClient.getFullName();
+		icatClient.checkQueueAllowed(userName);
 		JsonArray datasets = icatClient.getDatasets(visitId);
 
 		long downloadId;
@@ -892,6 +893,7 @@ public class UserResource {
 		// If we wanted to block the user, this is where we would do it
 		String userName = icatClient.getUserName();
 		String fullName = icatClient.getFullName();
+		icatClient.checkQueueAllowed(userName);
 		JsonArray datafiles = icatClient.getDatafiles(files);
 
 		long downloadId;

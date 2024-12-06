@@ -89,7 +89,24 @@ anonUserName=anon/anon
 # Downloads based on their fileCount up to this limit. If a single Dataset has a fileCount
 # greater than this limit, it will still be submitted in a part by itself.
 queue.maxFileCount = 10000
+
 # Limit the number maximum of active RESTORING downloads. Does not affect user submitted carts,
 # but queued requests will only be started when there are less than this many RESTORING downloads.
 # Negative values will start all queued jobs immediately, regardless of load.
 queue.maxActiveDownloads = 10
+
+# When queueing Downloads a positive priority will allow a User to proceed.
+# Non-positive values will block that User from submitting a request to the queue.
+# When automatically moving jobs from the queued to the PREPARING state, all Downloads
+# from Users with priority 1 will be scheduled before 2 and so on.
+# InstrumentScientists can either be identified for specific Instrument.names, or a global default
+# InvestigationUsers can either be identified for specific InvestigationUser.roles, or a global default
+# Authenticated Users without InstrumentScientist or InvestigationUser status will use the authenticated priority
+# Anyone who does not meet a specific priority class will use the default
+# Users meeting multiple criteria will use the highest priority available (lowest number)
+queue.priority.instrumentScientist.instruments = {"ABC": 1}
+queue.priority.instrumentScientist.default = 2
+queue.priority.investigationUser.roles = {"ABC": 3}
+queue.priority.investigationUser.default = 4
+queue.priority.authenticated = 5
+queue.priority.default = 0

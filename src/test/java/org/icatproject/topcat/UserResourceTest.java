@@ -257,6 +257,7 @@ public class UserResourceTest {
 
 	@Test
 	public void testQueueVisitId() throws Exception {
+		System.out.println("DEBUG testQueueVisitId");
 		List<Long> downloadIds = new ArrayList<>();
 		try {
 			String facilityName = "LILS";
@@ -294,6 +295,7 @@ public class UserResourceTest {
 
 	@Test
 	public void testQueueFiles() throws Exception {
+		System.out.println("DEBUG testQueueFiles");
 		List<Long> downloadIds = new ArrayList<>();
 		try {
 			String facilityName = "LILS";
