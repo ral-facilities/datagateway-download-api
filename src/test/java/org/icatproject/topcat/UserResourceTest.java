@@ -274,7 +274,7 @@ public class UserResourceTest {
 			userResource.setDownloadStatus(testDownload.getId(), facilityName, sessionId, DownloadStatus.RESTORING.toString());
 		});
 
-		Response response = userResource.getDownloads(facilityName, sessionId, "1 = 1");
+		Response response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 		List<Download> downloads = (List<Download>) response.getEntity();
 
