@@ -73,12 +73,10 @@ public class UserResourceTest {
 		TestHelpers.installTrustManager();
 	}
 
-	private String loginData;
-
 	@Before
 	public void setup() throws Exception {
 		HttpClient httpClient = new HttpClient("https://localhost:8181/icat");
-		loginData = "json=" + URLEncoder.encode(
+		String loginData = "json=" + URLEncoder.encode(
 				"{\"plugin\":\"simple\", \"credentials\":[{\"username\":\"root\"}, {\"password\":\"pw\"}]}", "UTF8");
 		String response = httpClient.post("session", new HashMap<String, String>(), loginData).toString();
 		sessionId = Utils.parseJsonObject(response).getString("sessionId");
@@ -88,10 +86,10 @@ public class UserResourceTest {
 
 	@Test
 	public void testLogin() throws Exception {
-		String loginResponseString = userResource.login("LILS", loginData);
+		String loginResponseString = userResource.login(null, "root", "pw", null);
 		JsonObject loginResponseObject = Utils.parseJsonObject(loginResponseString);
 
-		assertEquals(1, loginResponseObject.keySet().size());
+		assertEquals(loginResponseObject.toString(), 1, loginResponseObject.keySet().size());
 		assertTrue(loginResponseObject.containsKey("sessionId"));
 		// Will throw if not a UUID
 		UUID.fromString(loginResponseObject.getString("sessionId"));

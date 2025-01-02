@@ -72,6 +72,15 @@ public class FacilityMap {
 	}
 	
 	public String getIcatUrl( String facility ) throws InternalException{
+		if (facility == null) {
+			if (facilityIcatUrl.size() == 1) {
+				facility = facilityIcatUrl.keySet().iterator().next();
+			} else {
+				String error = "FacilityMap.getIcatUrl: facility is null and more than one facility set in config ";
+				logger.error( error );
+				throw new InternalException( error );
+			}
+		}
 		String url = facilityIcatUrl.get( facility );
 		if( url == null ){
 			String error = "FacilityMap.getIcatUrl: unknown facility: " + facility;
@@ -82,6 +91,15 @@ public class FacilityMap {
 	}
 
 	public String getIdsUrl( String facility ) throws InternalException{
+		if (facility == null) {
+			if (facilityIdsUrl.size() == 1) {
+				facility = facilityIdsUrl.keySet().iterator().next();
+			} else {
+				String error = "FacilityMap.getIdsUrl: facility is null and more than one facility set in config ";
+				logger.error( error );
+				throw new InternalException( error );
+			}
+		}
 		String url = facilityIdsUrl.get( facility );
 		if( url == null ){
 			String error = "FacilityMap.getIdsUrl: unknown facility: " + facility;
@@ -92,6 +110,15 @@ public class FacilityMap {
 	}
 	
 	public String getDownloadUrl( String facility, String downloadType ) throws InternalException{
+		if (facility == null) {
+			if (facilityIdsUrl.size() == 1) {
+				facility = facilityIdsUrl.keySet().iterator().next();
+			} else {
+				String error = "FacilityMap.getDownloadUrl: facility is null and more than one facility set in config ";
+				logger.error( error );
+				throw new InternalException( error );
+			}
+		}
 		String url = "";
 		// First, look for the property directly
 		url = properties.getProperty( "facility." + facility + ".downloadType." + downloadType, "" );
