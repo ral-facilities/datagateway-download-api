@@ -97,6 +97,11 @@ public class IcatClient {
 	/**
 	 * Gets a single Entity of the specified type, without any other conditions.
 	 * 
+	 * NOTE: This function is written and intended for getting a single Investigation,
+	 * Dataset or Datafile entity as part of the tests. It does not handle casing of
+	 * entities containing multiple words, or querying for a specific instance of an
+	 * entity.
+	 * 
 	 * @param entityType Type of ICAT Entity to get
 	 * @return A single ICAT Entity of the specified type as a JsonObject
 	 * @throws TopcatException
