@@ -151,9 +151,7 @@ public class UserResourceTest {
 		List<Download> downloads;
 
 		// Get the initial state of the downloads - may not be empty
-		// It appears queryOffset cannot be empty!
-		String queryOffset = "1 = 1";
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 
 		downloads = (List<Download>) response.getEntity();
@@ -183,7 +181,7 @@ public class UserResourceTest {
 		assertTrue(downloadId > 0);
 
 		// Now, there should be one download, whose downloadId matches
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 
 		// Doesn't parse as JSON, try a direct cast
@@ -224,7 +222,7 @@ public class UserResourceTest {
 
 		// and test that the new status has been set
 
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 		downloads = (List<Download>) response.getEntity();
 
@@ -242,7 +240,7 @@ public class UserResourceTest {
 		// and check that it has worked (again, not bothering to check that nothing else
 		// has changed)
 
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 		downloads = (List<Download>) response.getEntity();
 
