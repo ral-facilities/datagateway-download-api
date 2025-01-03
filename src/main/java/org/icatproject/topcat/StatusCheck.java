@@ -72,7 +72,7 @@ public class StatusCheck {
       Properties properties = Properties.getInstance();
       int pollDelay = Integer.valueOf(properties.getProperty("poll.delay", "600"));
       int pollIntervalWait = Integer.valueOf(properties.getProperty("poll.interval.wait", "600"));
-      int maxActiveDownloads = Integer.valueOf(properties.getProperty("queue.maxActiveDownloads", "0"));
+      int maxActiveDownloads = Integer.valueOf(properties.getProperty("queue.maxActiveDownloads", "1"));
 
       // For testing, separate out the poll body into its own method
       // And allow test configurations to disable scheduled status checks
@@ -280,6 +280,7 @@ public class StatusCheck {
    */
   public void startQueuedDownloads(int maxActiveDownloads) throws Exception {
     if (maxActiveDownloads == 0) {
+      logger.debug("Preparing of queued jobs disabled by config, skipping");
       return;
     }
 
@@ -292,17 +293,21 @@ public class StatusCheck {
     List<Download> activeDownloads = activeDownloadsQuery.getResultList();
 
     String queuedQueryString = selectString + " and " + pausedCondition + " and download.preparedId = null";
+    queuedQueryString += " order by download.createdAt";
+    TypedQuery<Download> queuedDownloadsQuery = em.createQuery(queuedQueryString, Download.class);
     if (maxActiveDownloads > 0) {
       int freeActiveDownloads = maxActiveDownloads - activeDownloads.size();
       if (freeActiveDownloads <= 0) {
+        String format = "More downloads currently RESTORING {} than maxActiveDownloads {}, cannot prepare queued jobs";
+        logger.info(format, activeDownloads.size(), maxActiveDownloads);
         return;
       }
-      queuedQueryString += " order by download.createdAt limit " + Integer.toString(freeActiveDownloads);
+      queuedDownloadsQuery.setMaxResults(freeActiveDownloads);
     }
 
-    TypedQuery<Download> queuedDownloadsQuery = em.createQuery(queuedQueryString, Download.class);
     List<Download> queuedDownloads = queuedDownloadsQuery.getResultList();
     
+    logger.info("Preparing {} queued downloads", queuedDownloads.size());
     for (Download queuedDownload : queuedDownloads) {
       queuedDownload.setStatus(DownloadStatus.PREPARING);
       prepareDownload(queuedDownload, null);
