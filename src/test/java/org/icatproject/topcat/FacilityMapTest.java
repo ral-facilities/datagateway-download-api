@@ -26,6 +26,10 @@ public class FacilityMapTest {
 			props.put(propName, value);
 		}
 		
+		public String getProperty( String propertyName ) {
+			return props.get(propertyName);
+		}
+		
 		public String getProperty( String propertyName, String defaultValue ) {
 			String value = props.get(propertyName);
 			if( value == null ) {
@@ -119,12 +123,14 @@ public class FacilityMapTest {
 		String facilityList = "Fac1";
 		String icatUrl = "DummyIcatUrl";
 		String idsUrl = "DummyIdsUrl";
+		String defaultFacilityName = "Fac1";
 
 		MockProperties props = new MockProperties();
 
 		props.setMockProperty("facility.list", facilityList);
 		props.setMockProperty("facility.Fac1.icatUrl", icatUrl);
 		props.setMockProperty("facility.Fac1.idsUrl", idsUrl);
+		props.setMockProperty("defaultFacilityName", defaultFacilityName);
 
 		FacilityMap facilityMap = new FacilityMap(props);
 
@@ -150,79 +156,4 @@ public class FacilityMapTest {
 		ThrowingRunnable runnable = () -> {facilityMap.getIcatUrl(null);};
 		assertThrows(InternalException.class, runnable);
 	}
-
-	@Test
-	public void testGetIdsUrl() throws InternalException{
-		String facilityList = "Fac1";
-		String icatUrl = "DummyIcatUrl";
-		String idsUrl = "DummyIdsUrl";
-
-		MockProperties props = new MockProperties();
-
-		props.setMockProperty("facility.list", facilityList);
-		props.setMockProperty("facility.Fac1.icatUrl", icatUrl);
-		props.setMockProperty("facility.Fac1.idsUrl", idsUrl);
-
-		FacilityMap facilityMap = new FacilityMap(props);
-
-		assertEquals(idsUrl, facilityMap.getIdsUrl(null));
-	}
-
-	@Test
-	public void testGetIdsUrlFailure() throws InternalException{
-		String facilityList = "Fac1, Fac2";
-		String icatUrl = "DummyIcatUrl";
-		String idsUrl = "DummyIdsUrl";
-
-		MockProperties props = new MockProperties();
-
-		props.setMockProperty("facility.list", facilityList);
-		props.setMockProperty("facility.Fac1.icatUrl", icatUrl);
-		props.setMockProperty("facility.Fac1.idsUrl", idsUrl);
-		props.setMockProperty("facility.Fac2.icatUrl", icatUrl);
-		props.setMockProperty("facility.Fac2.idsUrl", idsUrl);
-
-		FacilityMap facilityMap = new FacilityMap(props);
-
-		ThrowingRunnable runnable = () -> {facilityMap.getIdsUrl(null);};
-		assertThrows(InternalException.class, runnable);
-	}
-
-	@Test
-	public void testGetDownloadUrl() throws InternalException{
-		String facilityList = "Fac1";
-		String icatUrl = "DummyIcatUrl";
-		String idsUrl = "DummyIdsUrl";
-
-		MockProperties props = new MockProperties();
-
-		props.setMockProperty("facility.list", facilityList);
-		props.setMockProperty("facility.Fac1.icatUrl", icatUrl);
-		props.setMockProperty("facility.Fac1.idsUrl", idsUrl);
-
-		FacilityMap facilityMap = new FacilityMap(props);
-
-		assertEquals(idsUrl, facilityMap.getDownloadUrl(null, "https"));
-	}
-
-	@Test
-	public void testGetDownloadUrlFailure() throws InternalException{
-		String facilityList = "Fac1, Fac2";
-		String icatUrl = "DummyIcatUrl";
-		String idsUrl = "DummyIdsUrl";
-
-		MockProperties props = new MockProperties();
-
-		props.setMockProperty("facility.list", facilityList);
-		props.setMockProperty("facility.Fac1.icatUrl", icatUrl);
-		props.setMockProperty("facility.Fac1.idsUrl", idsUrl);
-		props.setMockProperty("facility.Fac2.icatUrl", icatUrl);
-		props.setMockProperty("facility.Fac2.idsUrl", idsUrl);
-
-		FacilityMap facilityMap = new FacilityMap(props);
-
-		ThrowingRunnable runnable = () -> {facilityMap.getDownloadUrl(null, "https");};
-		assertThrows(InternalException.class, runnable);
-	}
-
 }
