@@ -87,3 +87,7 @@ anonUserName=anon/anon
 
 # Authentication plugin to use if it is not specified in the login request
 defaultPlugin=simple
+# Limit the number maximum of active RESTORING downloads. Does not affect user submitted carts,
+# but queued requests will only be started when there are less than this many RESTORING downloads.
+# Negative values will start all queued jobs immediately, regardless of load.
+queue.maxActiveDownloads = 10
