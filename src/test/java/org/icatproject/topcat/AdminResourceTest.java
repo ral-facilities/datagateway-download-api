@@ -141,9 +141,7 @@ public class AdminResourceTest {
 		downloadRepository.save(testDownload);
 
 		// Get the current downloads - may not be empty
-		// It appears queryOffset cannot be empty!
-		String queryOffset = "1 = 1";
-		response = adminResource.getDownloads(facilityName, adminSessionId, queryOffset);
+		response = adminResource.getDownloads(facilityName, adminSessionId, null);
 		assertEquals(200, response.getStatus());
 
 		downloads = (List<Download>) response.getEntity();
@@ -151,7 +149,6 @@ public class AdminResourceTest {
 		// Check that the result tallies with the DownloadRepository contents
 
 		Map<String, Object> params = new HashMap<String, Object>();
-		params.put("queryOffset", queryOffset);
 		List<Download> repoDownloads = new ArrayList<Download>();
 		repoDownloads = downloadRepository.getDownloads(params);
 
@@ -171,7 +168,7 @@ public class AdminResourceTest {
 
 		// and test that the new status has been set
 
-		response = adminResource.getDownloads(facilityName, adminSessionId, queryOffset);
+		response = adminResource.getDownloads(facilityName, adminSessionId, null);
 		assertEquals(200, response.getStatus());
 		downloads = (List<Download>) response.getEntity();
 
@@ -190,7 +187,7 @@ public class AdminResourceTest {
 		// and check that it has worked (again, not bothering to check that nothing else
 		// has changed)
 
-		response = adminResource.getDownloads(facilityName, adminSessionId, queryOffset);
+		response = adminResource.getDownloads(facilityName, adminSessionId, null);
 		assertEquals(200, response.getStatus());
 		downloads = (List<Download>) response.getEntity();
 
@@ -201,7 +198,7 @@ public class AdminResourceTest {
 		// user
 
 		try {
-			response = adminResource.getDownloads(facilityName, nonAdminSessionId, queryOffset);
+			response = adminResource.getDownloads(facilityName, nonAdminSessionId, null);
 			// We should not see the following
 			System.out.println("DEBUG: AdminRT.getDownloads response: " + response.getStatus() + ", "
 					+ (String) response.getEntity());
@@ -234,6 +231,30 @@ public class AdminResourceTest {
 
 		// Remove the test download from the repository
 		downloadRepository.removeDownload(testDownload.getId());
+	}
+
+	@Test
+	public void testSetDownloadStatus() throws Exception {
+		Download testDownload = new Download();
+		String facilityName = "LILS";
+		testDownload.setFacilityName(facilityName);
+		testDownload.setSessionId(adminSessionId);
+		testDownload.setStatus(DownloadStatus.PAUSED);
+		testDownload.setIsDeleted(false);
+		testDownload.setUserName("simple/root");
+		testDownload.setFileName("testFile.txt");
+		testDownload.setTransport("http");
+		downloadRepository.save(testDownload);
+
+		Response response = adminResource.setDownloadStatus(testDownload.getId(), facilityName, adminSessionId, DownloadStatus.RESTORING.toString());
+		assertEquals(200, response.getStatus());
+
+		response = adminResource.getDownloads(facilityName, adminSessionId, null);
+		assertEquals(200, response.getStatus());
+		List<Download> downloads = (List<Download>) response.getEntity();
+
+		testDownload = findDownload(downloads, testDownload.getId());
+		assertEquals(DownloadStatus.PREPARING, testDownload.getStatus());
 	}
 
 	@Test
