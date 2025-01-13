@@ -281,7 +281,6 @@ public class UserResourceTest {
 			testDownload.setTransport("http");
 			downloadRepository.save(testDownload);
 			downloadId = testDownload.getId();
-			System.out.println("userstatus:" + downloadId);
 	
 			assertThrows("Cannot modify status of a queued download", ForbiddenException.class, () -> {
 				userResource.setDownloadStatus(testDownload.getId(), facilityName, sessionId, DownloadStatus.RESTORING.toString());
