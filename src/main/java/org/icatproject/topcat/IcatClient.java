@@ -23,11 +23,33 @@ public class IcatClient {
 
     private HttpClient httpClient;
     private String sessionId;
-   
-    public IcatClient(String url, String sessionId){
+
+	public IcatClient(String url) {
         this.httpClient = new HttpClient(url + "/icat");
+    }
+
+	public IcatClient(String url, String sessionId) {
+        this(url);
         this.sessionId = sessionId;
     }
+
+	/**
+	 * Login to create a session
+	 * 
+	 * @param jsonString with plugin and credentials which takes the form
+	 *                   <code>{"plugin":"db", "credentials:[{"username":"root"}, {"password":"guess"}]}</code>
+	 * @return json with sessionId of the form
+	 *         <samp>{"sessionId","0d9a3706-80d4-4d29-9ff3-4d65d4308a24"}</samp>
+	 * @throws BadRequestException
+	 */
+	public String login(String jsonString) throws BadRequestException {
+    	try {
+			Response response = httpClient.post("session", new HashMap<String, String>(), jsonString);
+			return response.toString();
+		} catch (Exception e) {
+			throw new BadRequestException(e.getMessage());
+		}
+	}
 
     public String getUserName() throws TopcatException {
     	try {
