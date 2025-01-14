@@ -99,3 +99,7 @@ queue.maxActiveDownloads = 10
 # Downloads based on their fileCount up to this limit. If a single Dataset has a fileCount
 # greater than this limit, it will still be submitted in a part by itself.
 queue.maxFileCount = 10000
+
+# Configurable limit for the length of the GET URL for requesting Datafiles by a list of file locations
+# The exact limit may depend on the server
+getUrlLimit=1024

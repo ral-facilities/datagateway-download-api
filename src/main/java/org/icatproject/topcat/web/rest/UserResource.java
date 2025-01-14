@@ -1,5 +1,6 @@
 package org.icatproject.topcat.web.rest;
 
+import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -864,7 +865,6 @@ public class UserResource {
 		long downloadFileCount = 0L;
 		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
 		List<Download> downloads = new ArrayList<Download>();
-		// String filename = formatQueuedFilename(facilityName, visitId, part);
 		Download newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 
 		for (JsonValue dataset : datasets) {
@@ -879,13 +879,9 @@ public class UserResource {
 			if (downloadFileCount > 0L && downloadFileCount + datasetFileCount > queueMaxFileCount) {
 				newDownload.setDownloadItems(downloadItems);
 				downloads.add(newDownload);
-				// downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
-				// jsonArrayBuilder.add(downloadId);
 
-				// part += 1L;
 				downloadFileCount = 0L;
 				downloadItems = new ArrayList<DownloadItem>();
-				// filename = formatQueuedFilename(facilityName, visitId, part);
 				newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 			}
 
@@ -895,8 +891,7 @@ public class UserResource {
 		}
 		newDownload.setDownloadItems(downloadItems);
 		downloads.add(newDownload);
-		// downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
-		// jsonArrayBuilder.add(downloadId);
+
 		int part = 1;
 		for (Download download : downloads) {
 			String filename = formatQueuedFilename(facilityName, visitId, part, downloads.size());
@@ -920,14 +915,15 @@ public class UserResource {
 	 * @param files        ICAT Datafile.locations to download
 	 * @return Array of Download ids
 	 * @throws TopcatException
+	 * @throws UnsupportedEncodingException 
 	 */
 	@POST
-	@Path("/queue/{facilityName}/files")
-	public Response queueFiles(@PathParam("facilityName") String facilityName,
+	@Path("/queue/files")
+	public Response queueFiles(@FormParam("facilityName") String facilityName,
 			@FormParam("sessionId") String sessionId, @FormParam("transport") String transport,
-			@FormParam("email") String email, @FormParam("files") List<String> files) throws TopcatException {
+			@FormParam("email") String email, @FormParam("files") List<String> files) throws TopcatException, UnsupportedEncodingException {
 
-		logger.info("queueVisitId called");
+		logger.info("queueFiles called");
 		validateTransport(transport);
 		if (files.size() == 0) {
 			throw new BadRequestException("At least one Datafile.location required");
@@ -941,31 +937,29 @@ public class UserResource {
 		// If we wanted to block the user, this is where we would do it
 		String userName = icatClient.getUserName();
 		String fullName = icatClient.getFullName();
-		JsonArray datafiles = icatClient.getDatafiles(files);
+		List<Long> datafileIds = icatClient.getDatafiles(files);
 
 		long downloadId;
 		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
 
-		long downloadFileCount = 0;
+		long downloadFileCount = 0L;
 		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
 		List<Download> downloads = new ArrayList<Download>();
 		Download newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 
-		for (JsonNumber datafileIdJsonNumber : datafiles.getValuesAs(JsonNumber.class)) {
-			long datafileId = datafileIdJsonNumber.longValueExact();
-
+		for (long datafileId : datafileIds) {
 			if (downloadFileCount >= queueMaxFileCount) {
 				newDownload.setDownloadItems(downloadItems);
 				downloads.add(newDownload);
 
-				downloadFileCount = 0;
+				downloadFileCount = 0L;
 				downloadItems = new ArrayList<DownloadItem>();
 				newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 			}
 
 			DownloadItem downloadItem = createDownloadItem(newDownload, datafileId, EntityType.datafile);
 			downloadItems.add(downloadItem);
-			downloadFileCount += 1;
+			downloadFileCount += 1L;
 		}
 		newDownload.setDownloadItems(downloadItems);
 		downloads.add(newDownload);
