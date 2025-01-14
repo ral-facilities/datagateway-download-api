@@ -23,6 +23,7 @@ import jakarta.ejb.EJB;
 import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.domain.*;
 import org.icatproject.topcat.exceptions.BadRequestException;
+import org.icatproject.topcat.exceptions.ForbiddenException;
 import org.icatproject.topcat.exceptions.NotFoundException;
 import org.icatproject.topcat.exceptions.TopcatException;
 
@@ -83,22 +84,32 @@ public class UserResourceTest {
 	@Before
 	public void setup() throws Exception {
 		HttpClient httpClient = new HttpClient("https://localhost:8181/icat");
-		String data = "json=" + URLEncoder.encode(
+		String loginData = "json=" + URLEncoder.encode(
 				"{\"plugin\":\"simple\", \"credentials\":[{\"username\":\"root\"}, {\"password\":\"pw\"}]}", "UTF8");
-		String response = httpClient.post("session", new HashMap<String, String>(), data).toString();
+		String response = httpClient.post("session", new HashMap<String, String>(), loginData).toString();
 		sessionId = Utils.parseJsonObject(response).getString("sessionId");
 
 		connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/icatdb", "icatdbuser", "icatdbuserpw");
 	}
 
 	@Test
+	public void testLogin() throws Exception {
+		String loginResponseString = userResource.login(null, "root", "pw", null);
+		JsonObject loginResponseObject = Utils.parseJsonObject(loginResponseString);
+
+		assertEquals(loginResponseObject.toString(), 1, loginResponseObject.keySet().size());
+		assertTrue(loginResponseObject.containsKey("sessionId"));
+		// Will throw if not a UUID
+		UUID.fromString(loginResponseObject.getString("sessionId"));
+	}
+
+	@Test
 	public void testGetSize() throws Exception {
 		String facilityName = "LILS";
 		String entityType = "investigation";
-		Long entityId = (long) 1;
 		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
-
-		List<Long> emptyIds = new ArrayList<Long>();
+		JsonObject investigation = icatClient.getEntity(entityType);
+		long entityId = investigation.getInt("id");
 
 		Response response = userResource.getSize(facilityName, sessionId, entityType, entityId);
 
@@ -112,6 +123,9 @@ public class UserResourceTest {
 	@Test
 	public void testCart() throws Exception {
 		String facilityName = "LILS";
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		JsonObject dataset = icatClient.getEntity("dataset");
+		long entityId = dataset.getInt("id");
 
 		Response response;
 
@@ -134,7 +148,7 @@ public class UserResourceTest {
 		// We assume that there is a dataset with id = 1, and that simple/root can see
 		// it.
 
-		response = userResource.addCartItems(facilityName, sessionId, "dataset 1", false);
+		response = userResource.addCartItems(facilityName, sessionId, "dataset " + entityId, false);
 		assertEquals(200, response.getStatus());
 
 		response = userResource.getCart(facilityName, sessionId);
@@ -145,7 +159,7 @@ public class UserResourceTest {
 		// Again, this ought to be done directly, rather than using the methods we
 		// should be testing independently!
 
-		response = userResource.deleteCartItems(facilityName, sessionId, "dataset 1");
+		response = userResource.deleteCartItems(facilityName, sessionId, "dataset " + entityId);
 		assertEquals(200, response.getStatus());
 		assertEquals(0, getCartSize(response));
 	}
@@ -156,11 +170,12 @@ public class UserResourceTest {
 		Response response;
 		JsonObject json;
 		List<Download> downloads;
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		JsonObject dataset = icatClient.getEntity("dataset");
+		long entityId = dataset.getInt("id");
 
 		// Get the initial state of the downloads - may not be empty
-		// It appears queryOffset cannot be empty!
-		String queryOffset = "1 = 1";
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 
 		downloads = (List<Download>) response.getEntity();
@@ -170,7 +185,7 @@ public class UserResourceTest {
 		System.out.println("DEBUG testSubmitCart: initial downloads size: " + initialDownloadsSize);
 
 		// Put something into the Cart, so we have something to submit
-		response = userResource.addCartItems(facilityName, sessionId, "dataset 1", false);
+		response = userResource.addCartItems(facilityName, sessionId, "dataset " + entityId, false);
 		assertEquals(200, response.getStatus());
 
 		// Now submit it
@@ -190,7 +205,7 @@ public class UserResourceTest {
 		assertTrue(downloadId > 0);
 
 		// Now, there should be one download, whose downloadId matches
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 
 		// Doesn't parse as JSON, try a direct cast
@@ -231,7 +246,7 @@ public class UserResourceTest {
 
 		// and test that the new status has been set
 
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 		downloads = (List<Download>) response.getEntity();
 
@@ -249,12 +264,45 @@ public class UserResourceTest {
 		// and check that it has worked (again, not bothering to check that nothing else
 		// has changed)
 
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 		downloads = (List<Download>) response.getEntity();
 
 		newDownload = findDownload(downloads, downloadId);
 		assertTrue(newDownload.getIsDeleted());
+	}
+
+	@Test
+	public void testSetDownloadStatus() throws Exception {
+		Long downloadId = null;
+		try {
+			Download testDownload = new Download();
+			String facilityName = "LILS";
+			testDownload.setFacilityName(facilityName);
+			testDownload.setSessionId(sessionId);
+			testDownload.setStatus(DownloadStatus.PAUSED);
+			testDownload.setIsDeleted(false);
+			testDownload.setUserName("simple/root");
+			testDownload.setFileName("testFile.txt");
+			testDownload.setTransport("http");
+			downloadRepository.save(testDownload);
+			downloadId = testDownload.getId();
+	
+			assertThrows("Cannot modify status of a queued download", ForbiddenException.class, () -> {
+				userResource.setDownloadStatus(testDownload.getId(), facilityName, sessionId, DownloadStatus.RESTORING.toString());
+			});
+	
+			Response response = userResource.getDownloads(facilityName, sessionId, null);
+			assertEquals(200, response.getStatus());
+			List<Download> downloads = (List<Download>) response.getEntity();
+	
+			Download unmodifiedDownload = findDownload(downloads, downloadId);
+			assertEquals(DownloadStatus.PAUSED, unmodifiedDownload.getStatus());
+		} finally {
+			if (downloadId != null) {
+				downloadRepository.removeDownload(downloadId);
+			}
+		}
 	}
 
 	@Test
@@ -375,7 +423,7 @@ public class UserResourceTest {
 	private Download findDownload(List<Download> downloads, Long downloadId) {
 
 		for (Download download : downloads) {
-			if (download.getId() == downloadId)
+			if (download.getId().equals(downloadId))
 				return download;
 		}
 		return null;

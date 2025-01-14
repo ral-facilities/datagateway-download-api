@@ -9,6 +9,7 @@ import java.net.URLEncoder;
 
 import org.icatproject.topcat.httpclient.*;
 import org.icatproject.topcat.exceptions.*;
+import org.apache.commons.lang3.StringUtils;
 import org.icatproject.topcat.domain.*;
 
 import jakarta.json.*;
@@ -22,11 +23,33 @@ public class IcatClient {
 
     private HttpClient httpClient;
     private String sessionId;
-   
-    public IcatClient(String url, String sessionId){
+
+	public IcatClient(String url) {
         this.httpClient = new HttpClient(url + "/icat");
+    }
+
+	public IcatClient(String url, String sessionId) {
+        this(url);
         this.sessionId = sessionId;
     }
+
+	/**
+	 * Login to create a session
+	 * 
+	 * @param jsonString with plugin and credentials which takes the form
+	 *                   <code>{"plugin":"db", "credentials:[{"username":"root"}, {"password":"guess"}]}</code>
+	 * @return json with sessionId of the form
+	 *         <samp>{"sessionId","0d9a3706-80d4-4d29-9ff3-4d65d4308a24"}</samp>
+	 * @throws BadRequestException
+	 */
+	public String login(String jsonString) throws BadRequestException {
+    	try {
+			Response response = httpClient.post("session", new HashMap<String, String>(), jsonString);
+			return response.toString();
+		} catch (Exception e) {
+			throw new BadRequestException(e.getMessage());
+		}
+	}
 
     public String getUserName() throws TopcatException {
     	try {
@@ -91,6 +114,33 @@ public class IcatClient {
     	} catch (Exception e){
             throw new BadRequestException(e.getMessage());
     	}
+	}
+
+	/**
+	 * Gets a single Entity of the specified type, without any other conditions.
+	 * 
+	 * @param entityType Type of ICAT Entity to get
+	 * @return A single ICAT Entity of the specified type as a JsonObject
+	 * @throws TopcatException
+	 */
+	public JsonObject getEntity(String entityType) throws TopcatException {
+		try {
+			String entityCapital = StringUtils.capitalize(entityType.toLowerCase());
+			String query = URLEncoder.encode("SELECT o FROM " + entityCapital + " o LIMIT 0, 1", "UTF8");
+			String url = "entityManager?sessionId="  + URLEncoder.encode(sessionId, "UTF8") + "&query=" + query;
+			Response response = httpClient.get(url, new HashMap<String, String>());
+			if(response.getCode() == 404){
+				throw new NotFoundException("Could not run getEntity got a 404 response");
+			} else if(response.getCode() >= 400){
+				throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
+			}
+			JsonObject entity = Utils.parseJsonArray(response.toString()).getJsonObject(0);
+			return entity.getJsonObject(entityCapital);
+		} catch (TopcatException e){
+			throw e;
+		} catch (Exception e) {
+			throw new BadRequestException(e.getMessage());
+		}
 	}
 
 	public List<JsonObject> getEntities(String entityType, List<Long> entityIds) throws TopcatException {
