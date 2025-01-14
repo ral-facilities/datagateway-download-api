@@ -289,7 +289,7 @@ public class UserResourceTest {
 				assertEquals(0, download.getInvestigationIds().size());
 				assertEquals(1, download.getDatasetIds().size());
 				assertEquals(0, download.getDatafileIds().size());
-				assertEquals("LILS_Proposal 0 - 0 0_000" + part, download.getFileName());
+				assertEquals("LILS_Proposal 0 - 0 0_part_" + part + "_of_3", download.getFileName());
 				assertEquals(transport, download.getTransport());
 				assertEquals("simple/root", download.getUserName());
 				assertEquals("simple/root", download.getFullName());

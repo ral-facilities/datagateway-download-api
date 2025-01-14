@@ -133,7 +133,7 @@ public class IcatClient {
 			String url = "entityManager?sessionId=" + URLEncoder.encode(sessionId, "UTF8") + "&query=" + encodedQuery;
 			Response response = httpClient.get(url, new HashMap<String, String>());
 			if (response.getCode() == 404) {
-				throw new NotFoundException("Could not run getEntities got a 404 response");
+				throw new NotFoundException("Could not run getDatasets got a 404 response");
 			} else if (response.getCode() >= 400) {
 				throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
 			}
@@ -162,7 +162,7 @@ public class IcatClient {
 			String url = "entityManager?sessionId=" + URLEncoder.encode(sessionId, "UTF8") + "&query=" + encodedQuery;
 			Response response = httpClient.get(url, new HashMap<String, String>());
 			if (response.getCode() == 404) {
-				throw new NotFoundException("Could not run getEntities got a 404 response");
+				throw new NotFoundException("Could not run getDatasetFileCount got a 404 response");
 			} else if (response.getCode() >= 400) {
 				throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
 			}
