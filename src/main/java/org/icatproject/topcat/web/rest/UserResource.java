@@ -62,6 +62,7 @@ public class UserResource {
 	private CacheRepository cacheRepository;
 
 	private String anonUserName;
+	private String defaultPlugin;
 	private long queueMaxFileCount;
 
 	@PersistenceContext(unitName = "topcat")
@@ -70,6 +71,7 @@ public class UserResource {
 	public UserResource() {
 		Properties properties = Properties.getInstance();
 		this.anonUserName = properties.getProperty("anonUserName", "");
+		this.defaultPlugin = properties.getProperty("defaultPlugin", "simple");
 		this.queueMaxFileCount = Long.valueOf(properties.getProperty("queue.maxFileCount", "10000"));
     }
 
@@ -83,6 +85,40 @@ public class UserResource {
 		} else {
 			return userName;
 		}
+	}
+
+	/**
+	 * Login to create a session
+	 * 
+	 * @param facilityName A facility name - properties must map this to a url to a valid ICAT REST api, if set.
+	 * @param username     ICAT username
+	 * @param password     Password for the specified authentication plugin
+	 * @param plugin       ICAT authentication plugin. If null, a default value will be used.
+	 * @return json with sessionId of the form
+	 *         <samp>{"sessionId","0d9a3706-80d4-4d29-9ff3-4d65d4308a24"}</samp>
+	 * @throws BadRequestException
+	 */
+	@POST
+	@Path("/session")
+	public String login(@QueryParam("facilityName") String facilityName, @FormParam("username") String username, @FormParam("password") String password, @FormParam("plugin") String plugin) throws BadRequestException {
+		if (plugin == null) {
+			plugin = defaultPlugin;
+		}
+		String icatUrl = getIcatUrl(facilityName);
+		IcatClient icatClient = new IcatClient(icatUrl);
+
+		JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
+		JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+		JsonObjectBuilder usernameBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder passwordBuilder = Json.createObjectBuilder();
+		usernameBuilder.add("username", username);
+		passwordBuilder.add("password", password);
+		arrayBuilder.add(usernameBuilder);
+		arrayBuilder.add(passwordBuilder);
+		objectBuilder.add("plugin", plugin);
+		objectBuilder.add("credentials", arrayBuilder);
+
+		return icatClient.login("json=" + objectBuilder.build().toString());
 	}
 
 	/**
@@ -262,6 +298,9 @@ public class UserResource {
 		if (!download.getUserName().equals(cartUserName)) {
 			throw new ForbiddenException("you do not have permission to delete this download");
 		}
+        if (download.getPreparedId() == null && download.getStatus().equals(DownloadStatus.PAUSED)) {
+            throw new ForbiddenException("Cannot modify status of a queued download");
+        }
 
         download.setStatus(DownloadStatus.valueOf(value));
         if(value.equals("COMPLETE")){
@@ -759,7 +798,7 @@ public class UserResource {
 	 * 
 	 * @param idsClient      Client for the IDS to use for the Download
 	 * @param download       Download to submit
-	 * @param downloadStatus Initial DownloadStatus to set iff the IDS isTwoLevel
+	 * @param downloadStatus Initial DownloadStatus to set if and only if the IDS isTwoLevel
 	 * @return Id of the new Download
 	 * @throws TopcatException
 	 */
@@ -801,8 +840,8 @@ public class UserResource {
 	 * @throws TopcatException
 	 */
 	@POST
-	@Path("/queue/{facilityName}/visit")
-	public Response queueVisitId(@PathParam("facilityName") String facilityName,
+	@Path("/queue/visit")
+	public Response queueVisitId(@FormParam("facilityName") String facilityName,
 			@FormParam("sessionId") String sessionId, @FormParam("transport") String transport,
 			@FormParam("email") String email, @FormParam("visitId") String visitId) throws TopcatException {
 
@@ -822,40 +861,50 @@ public class UserResource {
 		long downloadId;
 		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
 
-		long part = 1;
-		long downloadFileCount = 0;
+		long downloadFileCount = 0L;
 		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
-		String filename = formatQueuedFilename(facilityName, visitId, part);
-		Download download = createDownload(sessionId, facilityName, filename, userName, fullName, transport, email);
+		List<Download> downloads = new ArrayList<Download>();
+		// String filename = formatQueuedFilename(facilityName, visitId, part);
+		Download newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 
 		for (JsonValue dataset : datasets) {
 			JsonArray datasetArray = dataset.asJsonArray();
 			long datasetId = datasetArray.getJsonNumber(0).longValueExact();
 			long datasetFileCount = datasetArray.getJsonNumber(1).longValueExact();
-			if (datasetFileCount < 1) {
+			if (datasetFileCount < 1L) {
 				// Database triggers should set this, but check explicitly anyway
 				datasetFileCount = icatClient.getDatasetFileCount(datasetId);
 			}
 
-			if (downloadFileCount > 0 && downloadFileCount + datasetFileCount > queueMaxFileCount) {
-				download.setDownloadItems(downloadItems);
-				downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
-				jsonArrayBuilder.add(downloadId);
+			if (downloadFileCount > 0L && downloadFileCount + datasetFileCount > queueMaxFileCount) {
+				newDownload.setDownloadItems(downloadItems);
+				downloads.add(newDownload);
+				// downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
+				// jsonArrayBuilder.add(downloadId);
 
-				part += 1;
-				downloadFileCount = 0;
+				// part += 1L;
+				downloadFileCount = 0L;
 				downloadItems = new ArrayList<DownloadItem>();
-				filename = formatQueuedFilename(facilityName, visitId, part);
-				download = createDownload(sessionId, facilityName, filename, userName, fullName, transport, email);
+				// filename = formatQueuedFilename(facilityName, visitId, part);
+				newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 			}
 
-			DownloadItem downloadItem = createDownloadItem(download, datasetId, EntityType.dataset);
+			DownloadItem downloadItem = createDownloadItem(newDownload, datasetId, EntityType.dataset);
 			downloadItems.add(downloadItem);
 			downloadFileCount += datasetFileCount;
 		}
-		download.setDownloadItems(downloadItems);
-		downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
-		jsonArrayBuilder.add(downloadId);
+		newDownload.setDownloadItems(downloadItems);
+		downloads.add(newDownload);
+		// downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
+		// jsonArrayBuilder.add(downloadId);
+		int part = 1;
+		for (Download download : downloads) {
+			String filename = formatQueuedFilename(facilityName, visitId, part, downloads.size());
+			download.setFileName(filename);
+			downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
+			jsonArrayBuilder.add(downloadId);
+			part += 1;
+		}
 
 		return Response.ok(jsonArrayBuilder.build()).build();
 	}
@@ -897,34 +946,38 @@ public class UserResource {
 		long downloadId;
 		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
 
-		long part = 1;
 		long downloadFileCount = 0;
 		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
-		String filename = formatQueuedFilename(facilityName, "files", part);
-		Download download = createDownload(sessionId, facilityName, filename, userName, fullName, transport, email);
+		List<Download> downloads = new ArrayList<Download>();
+		Download newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 
 		for (JsonNumber datafileIdJsonNumber : datafiles.getValuesAs(JsonNumber.class)) {
 			long datafileId = datafileIdJsonNumber.longValueExact();
 
 			if (downloadFileCount >= queueMaxFileCount) {
-				download.setDownloadItems(downloadItems);
-				downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
-				jsonArrayBuilder.add(downloadId);
+				newDownload.setDownloadItems(downloadItems);
+				downloads.add(newDownload);
 
-				part += 1;
 				downloadFileCount = 0;
 				downloadItems = new ArrayList<DownloadItem>();
-				filename = formatQueuedFilename(facilityName, "files", part);
-				download = createDownload(sessionId, facilityName, filename, userName, fullName, transport, email);
+				newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 			}
 
-			DownloadItem downloadItem = createDownloadItem(download, datafileId, EntityType.datafile);
+			DownloadItem downloadItem = createDownloadItem(newDownload, datafileId, EntityType.datafile);
 			downloadItems.add(downloadItem);
 			downloadFileCount += 1;
 		}
-		download.setDownloadItems(downloadItems);
-		downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
-		jsonArrayBuilder.add(downloadId);
+		newDownload.setDownloadItems(downloadItems);
+		downloads.add(newDownload);
+
+		int part = 1;
+		for (Download download : downloads) {
+			String filename = formatQueuedFilename(facilityName, "files", part, downloads.size());
+			download.setFileName(filename);
+			downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
+			jsonArrayBuilder.add(downloadId);
+			part += 1;
+		}
 
 		return Response.ok(jsonArrayBuilder.build()).build();
 	}
@@ -935,12 +988,14 @@ public class UserResource {
 	 * @param facilityName ICAT Facility.name
 	 * @param visitId      ICAT Investigation.visitId
 	 * @param part         1 indexed part of the overall request
+	 * @param size         Number of parts in the overall request
 	 * @return Formatted filename
 	 */
-	private static String formatQueuedFilename(String facilityName, String visitId, long part) {
+	private static String formatQueuedFilename(String facilityName, String visitId, int part, int size) {
 		String partString = String.valueOf(part);
+		String sizeString = String.valueOf(size);
 		StringBuilder partBuilder = new StringBuilder();
-		while (partBuilder.length() + partString.length() < 4) {
+		while (partBuilder.length() + partString.length() < sizeString.length()) {
 			partBuilder.append("0");
 		}
 		partBuilder.append(partString);
@@ -949,8 +1004,10 @@ public class UserResource {
 		filenameBuilder.append(facilityName);
 		filenameBuilder.append("_");
 		filenameBuilder.append(visitId);
-		filenameBuilder.append("_");
+		filenameBuilder.append("_part_");
 		filenameBuilder.append(partBuilder);
+		filenameBuilder.append("_of_");
+		filenameBuilder.append(sizeString);
 		return filenameBuilder.toString();
 	}
 
@@ -1065,7 +1122,6 @@ public class UserResource {
 	}
 	
 	private String getIcatUrl( String facilityName ) throws BadRequestException{
-		testFacilityName( facilityName, "getIcatUrl" );
 		try {
 			return FacilityMap.getInstance().getIcatUrl(facilityName);
 		} catch (InternalException ie){
@@ -1074,7 +1130,6 @@ public class UserResource {
 	}
 
 	private String getIdsUrl( String facilityName ) throws BadRequestException{
-		testFacilityName( facilityName, "getIdsUrl" );
 		try {
 			return FacilityMap.getInstance().getIdsUrl(facilityName);
 		} catch (InternalException ie){
@@ -1083,23 +1138,10 @@ public class UserResource {
 	}
 
 	private String getDownloadUrl( String facilityName, String downloadType ) throws BadRequestException{
-		testFacilityName( facilityName, "getDownloadUrl" );
 		try {
 			return FacilityMap.getInstance().getDownloadUrl(facilityName, downloadType);
 		} catch (InternalException ie){
 			throw new BadRequestException( ie.getMessage() );
 		}
 	}
-	
-	private void testFacilityName( String facilityName, String methodName ) throws BadRequestException{
-		if( facilityName == null ){
-			// Most likely an old-style API request using icat/idsUrl
-			// rather than facilityName; so log and raise a specific error here.
-			String message = "UserResource." + methodName + ": facilityName is null. Perhaps request is using old API?";
-			logger.error( message );
-			throw new BadRequestException( message );
-		}
-	}
-
-
 }
