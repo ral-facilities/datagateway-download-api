@@ -116,3 +116,7 @@ queue.priority.investigationUser.roles = {"ABC": 3}
 queue.priority.investigationUser.default = 4
 queue.priority.authenticated = 5
 queue.priority.default = 0
+
+# Configurable limit for the length of the GET URL for requesting Datafiles by a list of file locations
+# The exact limit may depend on the server
+getUrlLimit=1024

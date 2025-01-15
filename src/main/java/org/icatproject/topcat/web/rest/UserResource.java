@@ -1,5 +1,6 @@
 package org.icatproject.topcat.web.rest;
 
+import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -91,7 +92,6 @@ public class UserResource {
 	 * Login to create a session
 	 * 
 	 * @param facilityName A facility name - properties must map this to a url to a valid ICAT REST api, if set.
-	 * 					   Can be null iff one Facility set in the config for the API.
 	 * @param username     ICAT username
 	 * @param password     Password for the specified authentication plugin
 	 * @param plugin       ICAT authentication plugin. If null, a default value will be used.
@@ -799,7 +799,7 @@ public class UserResource {
 	 * 
 	 * @param idsClient      Client for the IDS to use for the Download
 	 * @param download       Download to submit
-	 * @param downloadStatus Initial DownloadStatus to set iff the IDS isTwoLevel
+	 * @param downloadStatus Initial DownloadStatus to set if and only if the IDS isTwoLevel
 	 * @return Id of the new Download
 	 * @throws TopcatException
 	 */
@@ -841,8 +841,8 @@ public class UserResource {
 	 * @throws TopcatException
 	 */
 	@POST
-	@Path("/queue/{facilityName}/visit")
-	public Response queueVisitId(@PathParam("facilityName") String facilityName,
+	@Path("/queue/visit")
+	public Response queueVisitId(@FormParam("facilityName") String facilityName,
 			@FormParam("sessionId") String sessionId, @FormParam("transport") String transport,
 			@FormParam("email") String email, @FormParam("visitId") String visitId) throws TopcatException {
 
@@ -863,40 +863,44 @@ public class UserResource {
 		long downloadId;
 		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
 
-		long part = 1;
-		long downloadFileCount = 0;
+		long downloadFileCount = 0L;
 		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
-		String filename = formatQueuedFilename(facilityName, visitId, part);
-		Download download = createDownload(sessionId, facilityName, filename, userName, fullName, transport, email);
+		List<Download> downloads = new ArrayList<Download>();
+		Download newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 
 		for (JsonValue dataset : datasets) {
 			JsonArray datasetArray = dataset.asJsonArray();
 			long datasetId = datasetArray.getJsonNumber(0).longValueExact();
 			long datasetFileCount = datasetArray.getJsonNumber(1).longValueExact();
-			if (datasetFileCount < 1) {
+			if (datasetFileCount < 1L) {
 				// Database triggers should set this, but check explicitly anyway
 				datasetFileCount = icatClient.getDatasetFileCount(datasetId);
 			}
 
-			if (downloadFileCount > 0 && downloadFileCount + datasetFileCount > queueMaxFileCount) {
-				download.setDownloadItems(downloadItems);
-				downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
-				jsonArrayBuilder.add(downloadId);
+			if (downloadFileCount > 0L && downloadFileCount + datasetFileCount > queueMaxFileCount) {
+				newDownload.setDownloadItems(downloadItems);
+				downloads.add(newDownload);
 
-				part += 1;
-				downloadFileCount = 0;
+				downloadFileCount = 0L;
 				downloadItems = new ArrayList<DownloadItem>();
-				filename = formatQueuedFilename(facilityName, visitId, part);
-				download = createDownload(sessionId, facilityName, filename, userName, fullName, transport, email);
+				newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 			}
 
-			DownloadItem downloadItem = createDownloadItem(download, datasetId, EntityType.dataset);
+			DownloadItem downloadItem = createDownloadItem(newDownload, datasetId, EntityType.dataset);
 			downloadItems.add(downloadItem);
 			downloadFileCount += datasetFileCount;
 		}
-		download.setDownloadItems(downloadItems);
-		downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
-		jsonArrayBuilder.add(downloadId);
+		newDownload.setDownloadItems(downloadItems);
+		downloads.add(newDownload);
+
+		int part = 1;
+		for (Download download : downloads) {
+			String filename = formatQueuedFilename(facilityName, visitId, part, downloads.size());
+			download.setFileName(filename);
+			downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
+			jsonArrayBuilder.add(downloadId);
+			part += 1;
+		}
 
 		return Response.ok(jsonArrayBuilder.build()).build();
 	}
@@ -912,14 +916,15 @@ public class UserResource {
 	 * @param files        ICAT Datafile.locations to download
 	 * @return Array of Download ids
 	 * @throws TopcatException
+	 * @throws UnsupportedEncodingException 
 	 */
 	@POST
-	@Path("/queue/{facilityName}/files")
-	public Response queueFiles(@PathParam("facilityName") String facilityName,
+	@Path("/queue/files")
+	public Response queueFiles(@FormParam("facilityName") String facilityName,
 			@FormParam("sessionId") String sessionId, @FormParam("transport") String transport,
-			@FormParam("email") String email, @FormParam("files") List<String> files) throws TopcatException {
+			@FormParam("email") String email, @FormParam("files") List<String> files) throws TopcatException, UnsupportedEncodingException {
 
-		logger.info("queueVisitId called");
+		logger.info("queueFiles called");
 		validateTransport(transport);
 		if (files.size() == 0) {
 			throw new BadRequestException("At least one Datafile.location required");
@@ -934,39 +939,41 @@ public class UserResource {
 		String userName = icatClient.getUserName();
 		String fullName = icatClient.getFullName();
 		icatClient.checkQueueAllowed(userName);
-		JsonArray datafiles = icatClient.getDatafiles(files);
+		List<Long> datafileIds = icatClient.getDatafiles(files);
 
 		long downloadId;
 		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
 
-		long part = 1;
-		long downloadFileCount = 0;
+		long downloadFileCount = 0L;
 		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
-		String filename = formatQueuedFilename(facilityName, "files", part);
-		Download download = createDownload(sessionId, facilityName, filename, userName, fullName, transport, email);
+		List<Download> downloads = new ArrayList<Download>();
+		Download newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 
-		for (JsonNumber datafileIdJsonNumber : datafiles.getValuesAs(JsonNumber.class)) {
-			long datafileId = datafileIdJsonNumber.longValueExact();
-
+		for (long datafileId : datafileIds) {
 			if (downloadFileCount >= queueMaxFileCount) {
-				download.setDownloadItems(downloadItems);
-				downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
-				jsonArrayBuilder.add(downloadId);
+				newDownload.setDownloadItems(downloadItems);
+				downloads.add(newDownload);
 
-				part += 1;
-				downloadFileCount = 0;
+				downloadFileCount = 0L;
 				downloadItems = new ArrayList<DownloadItem>();
-				filename = formatQueuedFilename(facilityName, "files", part);
-				download = createDownload(sessionId, facilityName, filename, userName, fullName, transport, email);
+				newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 			}
 
-			DownloadItem downloadItem = createDownloadItem(download, datafileId, EntityType.datafile);
+			DownloadItem downloadItem = createDownloadItem(newDownload, datafileId, EntityType.datafile);
 			downloadItems.add(downloadItem);
-			downloadFileCount += 1;
+			downloadFileCount += 1L;
 		}
-		download.setDownloadItems(downloadItems);
-		downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
-		jsonArrayBuilder.add(downloadId);
+		newDownload.setDownloadItems(downloadItems);
+		downloads.add(newDownload);
+
+		int part = 1;
+		for (Download download : downloads) {
+			String filename = formatQueuedFilename(facilityName, "files", part, downloads.size());
+			download.setFileName(filename);
+			downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
+			jsonArrayBuilder.add(downloadId);
+			part += 1;
+		}
 
 		return Response.ok(jsonArrayBuilder.build()).build();
 	}
@@ -977,12 +984,14 @@ public class UserResource {
 	 * @param facilityName ICAT Facility.name
 	 * @param visitId      ICAT Investigation.visitId
 	 * @param part         1 indexed part of the overall request
+	 * @param size         Number of parts in the overall request
 	 * @return Formatted filename
 	 */
-	private static String formatQueuedFilename(String facilityName, String visitId, long part) {
+	private static String formatQueuedFilename(String facilityName, String visitId, int part, int size) {
 		String partString = String.valueOf(part);
+		String sizeString = String.valueOf(size);
 		StringBuilder partBuilder = new StringBuilder();
-		while (partBuilder.length() + partString.length() < 4) {
+		while (partBuilder.length() + partString.length() < sizeString.length()) {
 			partBuilder.append("0");
 		}
 		partBuilder.append(partString);
@@ -991,8 +1000,10 @@ public class UserResource {
 		filenameBuilder.append(facilityName);
 		filenameBuilder.append("_");
 		filenameBuilder.append(visitId);
-		filenameBuilder.append("_");
+		filenameBuilder.append("_part_");
 		filenameBuilder.append(partBuilder);
+		filenameBuilder.append("_of_");
+		filenameBuilder.append(sizeString);
 		return filenameBuilder.toString();
 	}
 

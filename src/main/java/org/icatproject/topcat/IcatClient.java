@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 
 import org.icatproject.topcat.httpclient.*;
@@ -22,17 +23,17 @@ public class IcatClient {
 
 	private Logger logger = LoggerFactory.getLogger(IcatClient.class);
 
-    private HttpClient httpClient;
-    private String sessionId;
+	private HttpClient httpClient;
+	private String sessionId;
 
 	public IcatClient(String url) {
-        this.httpClient = new HttpClient(url + "/icat");
-    }
+		this.httpClient = new HttpClient(url + "/icat");
+	}
 
 	public IcatClient(String url, String sessionId) {
-        this(url);
-        this.sessionId = sessionId;
-    }
+		this(url);
+		this.sessionId = sessionId;
+	}
 
 	/**
 	 * Login to create a session
@@ -44,7 +45,7 @@ public class IcatClient {
 	 * @throws BadRequestException
 	 */
 	public String login(String jsonString) throws BadRequestException {
-    	try {
+		try {
 			Response response = httpClient.post("session", new HashMap<String, String>(), jsonString);
 			return response.toString();
 		} catch (Exception e) {
@@ -52,21 +53,21 @@ public class IcatClient {
 		}
 	}
 
-    public String getUserName() throws TopcatException {
-    	try {
-    		Response response = httpClient.get("session/" + sessionId, new HashMap<String, String>());
-    		if(response.getCode() == 404){
-                throw new NotFoundException("Could not run getUserName got a 404 response");
-            } else if(response.getCode() >= 400){
-                throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
-            }
-    		return Utils.parseJsonObject(response.toString()).getString("userName");
-    	} catch (TopcatException e){
-            throw e;
-    	} catch (Exception e){
-            throw new BadRequestException(e.getMessage());
-    	}
-    }
+	public String getUserName() throws TopcatException {
+		try {
+			Response response = httpClient.get("session/" + sessionId, new HashMap<String, String>());
+			if(response.getCode() == 404){
+				throw new NotFoundException("Could not run getUserName got a 404 response");
+			} else if(response.getCode() >= 400){
+				throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
+			}
+			return Utils.parseJsonObject(response.toString()).getString("userName");
+		} catch (TopcatException e){
+			throw e;
+		} catch (Exception e){
+			throw new BadRequestException(e.getMessage());
+		}
+	}
 
 	public Boolean isAdmin() throws TopcatException {
 		try {
@@ -92,29 +93,29 @@ public class IcatClient {
 		try {
 			String query = "select user.fullName from User user where user.name = :user";
 			String url = "entityManager?sessionId=" + URLEncoder.encode(sessionId, "UTF8") + "&query=" + URLEncoder.encode(query, "UTF8");
-    		Response response = httpClient.get(url, new HashMap<String, String>());
-    		
-    		if(response.getCode() == 404){
-    			logger.error("IcatClient.getFullName: got a 404 response");
-                throw new NotFoundException("Could not run getFullName got a 404 response");
-            } else if(response.getCode() >= 400){
-            	String message = Utils.parseJsonObject(response.toString()).getString("message");
-    			logger.error("IcatClient.getFullName: got a " + response.getCode() + " response: " + message);
-                throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
-            }
+			Response response = httpClient.get(url, new HashMap<String, String>());
+			
+			if(response.getCode() == 404){
+				logger.error("IcatClient.getFullName: got a 404 response");
+				throw new NotFoundException("Could not run getFullName got a 404 response");
+			} else if(response.getCode() >= 400){
+				String message = Utils.parseJsonObject(response.toString()).getString("message");
+				logger.error("IcatClient.getFullName: got a " + response.getCode() + " response: " + message);
+				throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
+			}
 
-    		JsonArray responseArray = Utils.parseJsonArray(response.toString());
-    		if( responseArray.size() == 0 || responseArray.isNull(0) ){
-    			logger.warn("IcatClient.getFullName: client returned no or null result, so returning userName");
-    			return getUserName();
-    		} else {
-    			return responseArray.getString(0);
-    		}
-    	} catch (TopcatException e){
-            throw e;
-    	} catch (Exception e){
-            throw new BadRequestException(e.getMessage());
-    	}
+			JsonArray responseArray = Utils.parseJsonArray(response.toString());
+			if( responseArray.size() == 0 || responseArray.isNull(0) ){
+				logger.warn("IcatClient.getFullName: client returned no or null result, so returning userName");
+				return getUserName();
+			} else {
+				return responseArray.getString(0);
+			}
+		} catch (TopcatException e){
+			throw e;
+		} catch (Exception e){
+			throw new BadRequestException(e.getMessage());
+		}
 	}
 
 	/**
@@ -132,24 +133,53 @@ public class IcatClient {
 	}
 
 	/**
-	 * Get all Datafiles in the list of file locations.
+	 * Get all Datafiles in the list of file locations, chunking to avoid a GET request
+	 * which exceeds the configurable limit.
 	 * 
 	 * @param files List of ICAT Datafile.locations
-	 * @return JsonArray of Datafile ids.
+	 * @return List of Datafile ids.
 	 * @throws TopcatException
+	 * @throws UnsupportedEncodingException 
 	 */
-	public JsonArray getDatafiles(List<String> files) throws TopcatException {
-		StringBuilder stringBuilder = new StringBuilder();
-		ListIterator<String> fileIterator = files.listIterator();
-		stringBuilder.append("'" + fileIterator.next() + "'");
-		fileIterator.forEachRemaining(file -> {
-			stringBuilder.append(",");
-			stringBuilder.append("'" + file + "'");
-		});
-		String formattedFiles = stringBuilder.toString();
-		String query = "SELECT datafile.id from Datafile datafile";
-		query += " WHERE datafile.location in (" + formattedFiles + ") ORDER BY datafile.id";
-		return submitQuery(query);
+	public List<Long> getDatafiles(List<String> files) throws TopcatException, UnsupportedEncodingException {
+		List<Long> datafileIds = new ArrayList<>();
+		if (files.size() == 0) {
+			// Ensure that we don't error when calling .next() below by returning early
+			return datafileIds;
+		}
+
+		// Total limit - "entityManager?sessionId=" - `sessionId` - "?query=" - `queryPrefix` - `querySuffix
+		// Limit is 1024 - 24 - 36 - 7 - 51 - 17
+		int getUrlLimit = Integer.parseInt(Properties.getInstance().getProperty("getUrlLimit", "1024"));
+		int chunkLimit = getUrlLimit - 135;
+		String queryPrefix = "SELECT d.id from Datafile d WHERE d.location in (";
+		String querySuffix = ") ORDER BY d.id";
+		ListIterator<String> iterator = files.listIterator();
+
+		String chunkedFiles = "'" + iterator.next() + "'";
+		int chunkSize = URLEncoder.encode(chunkedFiles, "UTF8").length();
+		while (iterator.hasNext()) {
+			String file = "'" + iterator.next() + "'";
+			int encodedFileLength = URLEncoder.encode(file, "UTF8").length();
+			if (chunkSize + 3 + encodedFileLength > chunkLimit) {
+				JsonArray jsonArray = submitQuery(queryPrefix + chunkedFiles + querySuffix);
+				for (JsonNumber datafileIdJsonNumber : jsonArray.getValuesAs(JsonNumber.class)) {
+					datafileIds.add(datafileIdJsonNumber.longValueExact());
+				}
+
+				chunkedFiles = file;
+				chunkSize = encodedFileLength;
+			} else {
+				chunkedFiles += "," + file;
+				chunkSize += 3 + encodedFileLength;  // 3 is size of , when encoded as %2C
+			}
+		}
+		JsonArray jsonArray = submitQuery(queryPrefix + chunkedFiles + querySuffix);
+		for (JsonNumber datafileIdJsonNumber : jsonArray.getValuesAs(JsonNumber.class)) {
+			datafileIds.add(datafileIdJsonNumber.longValueExact());
+		}
+	
+		return datafileIds;
 	}
 
 	/**
@@ -168,10 +198,10 @@ public class IcatClient {
 	}
 
 	/**
-	 * Utility method for submitting an unformatted query to the entityManager
+	 * Utility method for submitting an unencoded query to the entityManager
 	 * endpoint, and returning the resultant JsonArray.
 	 * 
-	 * @param query Unformatted String query to submit
+	 * @param query Unencoded String query to submit
 	 * @return JsonArray of results, contents will depend on the query.
 	 * @throws TopcatException
 	 */
@@ -181,17 +211,18 @@ public class IcatClient {
 			String url = "entityManager?sessionId=" + URLEncoder.encode(sessionId, "UTF8") + "&query=" + encodedQuery;
 			Response response = httpClient.get(url, new HashMap<String, String>());
 			if (response.getCode() == 404) {
-				throw new NotFoundException("Could not run getEntities got a 404 response");
+				throw new NotFoundException("Could not run submitQuery got a 404 response");
 			} else if (response.getCode() >= 400) {
 				throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
 			}
 			return Utils.parseJsonArray(response.toString());
 		} catch (TopcatException e) {
-            throw e;		} catch (Exception e) {
-				throw new BadRequestException(e.getMessage());
-			}
+            throw e;
+		} catch (Exception e) {
+			throw new BadRequestException(e.getMessage());
 		}
-	
+	}
+
 	/**
 	 * Gets a single Entity of the specified type, without any other conditions.
 	 * 
@@ -200,9 +231,26 @@ public class IcatClient {
 	 * @throws TopcatException
 	 */
 	public JsonObject getEntity(String entityType) throws TopcatException {
+		return getEntities(entityType, 1L).get(0);
+	}
+
+
+	/**
+	 * Gets multiple Entities of the specified type, without any other conditions.
+	 * 
+	 * NOTE: This function is written and intended for getting Investigation,
+	 * Dataset or Datafile entities as part of the tests. It does not handle casing of
+	 * entities containing multiple words, or querying for a specific instance of an
+	 * entity.
+	 * 
+	 * @param entityType Type of ICAT Entity to get
+	 * @return A ICAT Entities of the specified type as JsonObjects
+	 * @throws TopcatException
+	 */
+	public List<JsonObject> getEntities(String entityType, long limit) throws TopcatException {
 		try {
 			String entityCapital = StringUtils.capitalize(entityType.toLowerCase());
-			String query = URLEncoder.encode("SELECT o FROM " + entityCapital + " o LIMIT 0, 1", "UTF8");
+			String query = URLEncoder.encode("SELECT o FROM " + entityCapital + " o LIMIT 0, " + limit, "UTF8");
 			String url = "entityManager?sessionId="  + URLEncoder.encode(sessionId, "UTF8") + "&query=" + query;
 			Response response = httpClient.get(url, new HashMap<String, String>());
 			if(response.getCode() == 404){
@@ -210,8 +258,11 @@ public class IcatClient {
 			} else if(response.getCode() >= 400){
 				throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
 			}
-			JsonObject entity = Utils.parseJsonArray(response.toString()).getJsonObject(0);
-			return entity.getJsonObject(entityCapital);
+			List<JsonObject> entities = new ArrayList<>();
+			for (JsonValue entity : Utils.parseJsonArray(response.toString())) {
+				entities.add(((JsonObject) entity).getJsonObject(entityCapital));
+			}
+			return entities;
 		} catch (TopcatException e){
 			throw e;
 		} catch (Exception e) {
