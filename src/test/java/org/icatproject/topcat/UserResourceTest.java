@@ -267,6 +267,42 @@ public class UserResourceTest {
 	}
 
 	@Test
+	public void testQueueVisitId() throws Exception {
+		List<Long> downloadIds = new ArrayList<>();
+		try {
+			String facilityName = "LILS";
+			String transport = "http";
+			String email = "";
+			String visitId = "Proposal 0 - 0 0";
+			Response response = userResource.queueVisitId(facilityName, sessionId, transport, email, visitId);
+			assertEquals(200, response.getStatus());
+	
+			JsonArray downloadIdsArray = Utils.parseJsonArray(response.getEntity().toString());
+			assertEquals(3, downloadIdsArray.size());
+			long part = 1;
+			for (JsonNumber downloadIdJson : downloadIdsArray.getValuesAs(JsonNumber.class)) {
+				long downloadId = downloadIdJson.longValueExact();
+				downloadIds.add(downloadId);
+				Download download = downloadRepository.getDownload(downloadId);
+				assertNull(download.getPreparedId());
+				assertEquals(DownloadStatus.PAUSED, download.getStatus());
+				assertEquals(0, download.getInvestigationIds().size());
+				assertEquals(1, download.getDatasetIds().size());
+				assertEquals(0, download.getDatafileIds().size());
+				assertEquals("LILS_Proposal 0 - 0 0_part_" + part + "_of_3", download.getFileName());
+				assertEquals(transport, download.getTransport());
+				assertEquals("simple/root", download.getUserName());
+				assertEquals("simple/root", download.getFullName());
+				assertEquals("", download.getEmail());
+				part += 1;
+			}
+		} finally {
+			for (long downloadId : downloadIds) {
+				downloadRepository.removeDownload(downloadId);
+			}
+		}
+	}
+
 	public void testSetDownloadStatus() throws Exception {
 		Long downloadId = null;
 		try {

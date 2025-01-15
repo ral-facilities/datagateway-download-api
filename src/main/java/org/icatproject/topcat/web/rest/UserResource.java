@@ -63,6 +63,7 @@ public class UserResource {
 
 	private String anonUserName;
 	private String defaultPlugin;
+	private long queueMaxFileCount;
 
 	@PersistenceContext(unitName = "topcat")
 	EntityManager em;
@@ -71,6 +72,7 @@ public class UserResource {
 		Properties properties = Properties.getInstance();
 		this.anonUserName = properties.getProperty("anonUserName", "");
 		this.defaultPlugin = properties.getProperty("defaultPlugin", "simple");
+		this.queueMaxFileCount = Long.valueOf(properties.getProperty("queue.maxFileCount", "10000"));
     }
 
 	/**
@@ -89,7 +91,6 @@ public class UserResource {
 	 * Login to create a session
 	 * 
 	 * @param facilityName A facility name - properties must map this to a url to a valid ICAT REST api, if set.
-	 * 					   Can be null iff one Facility set in the config for the API.
 	 * @param username     ICAT username
 	 * @param password     Password for the specified authentication plugin
 	 * @param plugin       ICAT authentication plugin. If null, a default value will be used.
@@ -705,9 +706,7 @@ public class UserResource {
 			throw new BadRequestException("fileName is required");
 		}
 
-		if (transport == null || transport.trim().isEmpty()) {
-			throw new BadRequestException("transport is required");
-		}
+		validateTransport(transport);
 
 		String icatUrl = getIcatUrl( facilityName );
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
@@ -725,50 +724,21 @@ public class UserResource {
 		if(email != null && email.equals("")){
 			email = null;
 		}
-		
+
 
 		if (cart != null) {
 			em.refresh(cart);
-			
-			Download download = new Download();
-			download.setSessionId(sessionId);
-			download.setFacilityName(cart.getFacilityName());
-			download.setFileName(fileName);
-			download.setUserName(cart.getUserName());
-			download.setFullName(fullName);
-			download.setTransport(transport);
-			download.setEmail(email);
-			download.setIsEmailSent(false);
-			download.setSize(0);
-
+			Download download = createDownload(sessionId, cart.getFacilityName(), fileName, cart.getUserName(),
+					fullName, transport, email);
 			List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
-
 			for (CartItem cartItem : cart.getCartItems()) {
-				DownloadItem downloadItem = new DownloadItem();
-				downloadItem.setEntityId(cartItem.getEntityId());
-				downloadItem.setEntityType(cartItem.getEntityType());
-				downloadItem.setDownload(download);
+				DownloadItem downloadItem = createDownloadItem(download, cartItem.getEntityId(),
+						cartItem.getEntityType());
 				downloadItems.add(downloadItem);
 			}
-
 			download.setDownloadItems(downloadItems);
-
-			Boolean isTwoLevel = idsClient.isTwoLevel();
-			download.setIsTwoLevel(isTwoLevel);
-
-			if(isTwoLevel){
-				download.setStatus(DownloadStatus.PREPARING);
-			} else {
-				String preparedId = idsClient.prepareData(download.getSessionId(), download.getInvestigationIds(), download.getDatasetIds(), download.getDatafileIds());
-      			download.setPreparedId(preparedId);
-				download.setStatus(DownloadStatus.COMPLETE);
-			}
-
+			downloadId = submitDownload(idsClient, download, DownloadStatus.PREPARING);
 			try {
-				em.persist(download);
-				em.flush();
-				em.refresh(download);
-				downloadId = download.getId();
 				em.remove(cart);
 				em.flush();
 			} catch (Exception e) {
@@ -780,7 +750,205 @@ public class UserResource {
 		return emptyCart(facilityName, cartUserName, downloadId);
 	}
 
+	/**
+	 * Create a new Download object and set basic fields, excluding data and status.
+	 * 
+	 * @param sessionId    ICAT sessionId
+	 * @param facilityName ICAT Facility.name
+	 * @param fileName     Filename for the resultant Download
+	 * @param userName     ICAT User.name
+	 * @param fullName     ICAT User.fullName
+	 * @param transport    Transport mechanism to use
+	 * @param email        Optional email to send notification to on completion
+	 * @return Download object with basic fields set
+	 */
+	private static Download createDownload(String sessionId, String facilityName, String fileName, String userName,
+			String fullName, String transport, String email) {
+		Download download = new Download();
+		download.setSessionId(sessionId);
+		download.setFacilityName(facilityName);
+		download.setFileName(fileName);
+		download.setUserName(userName);
+		download.setFullName(fullName);
+		download.setTransport(transport);
+		download.setEmail(email);
+		download.setIsEmailSent(false);
+		download.setSize(0);
+		return download;
+	}
 
+	/**
+	 * Create a new DownloadItem.
+	 * 
+	 * @param download   Parent Download
+	 * @param entityId   ICAT Entity.id
+	 * @param entityType EntityType
+	 * @return DownloadItem with fields set
+	 */
+	private static DownloadItem createDownloadItem(Download download, long entityId, EntityType entityType) {
+		DownloadItem downloadItem = new DownloadItem();
+		downloadItem.setEntityId(entityId);
+		downloadItem.setEntityType(entityType);
+		downloadItem.setDownload(download);
+		return downloadItem;
+	}
+
+	/**
+	 * Set the final fields and persist a new Download request.
+	 * 
+	 * @param idsClient      Client for the IDS to use for the Download
+	 * @param download       Download to submit
+	 * @param downloadStatus Initial DownloadStatus to set if and only if the IDS isTwoLevel
+	 * @return Id of the new Download
+	 * @throws TopcatException
+	 */
+	private long submitDownload(IdsClient idsClient, Download download, DownloadStatus downloadStatus)
+			throws TopcatException {
+		Boolean isTwoLevel = idsClient.isTwoLevel();
+		download.setIsTwoLevel(isTwoLevel);
+
+		if (isTwoLevel) {
+			download.setStatus(downloadStatus);
+		} else {
+			String preparedId = idsClient.prepareData(download.getSessionId(), download.getInvestigationIds(),
+					download.getDatasetIds(), download.getDatafileIds());
+			download.setPreparedId(preparedId);
+			download.setStatus(DownloadStatus.COMPLETE);
+		}
+
+		try {
+			em.persist(download);
+			em.flush();
+			em.refresh(download);
+			return download.getId();
+		} catch (Exception e) {
+			logger.info("submitCart: exception during EntityManager operations: " + e.getMessage());
+			throw new BadRequestException("Unable to submit for cart for download");
+		}
+	}
+
+	/**
+	 * Queue an entire visit for download, split by Dataset into part Downloads if
+	 * needed.
+	 * 
+	 * @param facilityName ICAT Facility.name
+	 * @param sessionId    ICAT sessionId
+	 * @param transport    Transport mechanism to use
+	 * @param email        Optional email to notify upon completion
+	 * @param visitId      ICAT Investigation.visitId to submit
+	 * @return Array of Download ids
+	 * @throws TopcatException
+	 */
+	@POST
+	@Path("/queue/visit")
+	public Response queueVisitId(@FormParam("facilityName") String facilityName,
+			@FormParam("sessionId") String sessionId, @FormParam("transport") String transport,
+			@FormParam("email") String email, @FormParam("visitId") String visitId) throws TopcatException {
+
+		logger.info("queueVisitId called");
+		validateTransport(transport);
+
+		String icatUrl = getIcatUrl(facilityName);
+		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
+		String transportUrl = getDownloadUrl(facilityName, transport);
+		IdsClient idsClient = new IdsClient(transportUrl);
+
+		// If we wanted to block the user, this is where we would do it
+		String userName = icatClient.getUserName();
+		String fullName = icatClient.getFullName();
+		JsonArray datasets = icatClient.getDatasets(visitId);
+
+		long downloadId;
+		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
+
+		long downloadFileCount = 0L;
+		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
+		List<Download> downloads = new ArrayList<Download>();
+		// String filename = formatQueuedFilename(facilityName, visitId, part);
+		Download newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
+
+		for (JsonValue dataset : datasets) {
+			JsonArray datasetArray = dataset.asJsonArray();
+			long datasetId = datasetArray.getJsonNumber(0).longValueExact();
+			long datasetFileCount = datasetArray.getJsonNumber(1).longValueExact();
+			if (datasetFileCount < 1L) {
+				// Database triggers should set this, but check explicitly anyway
+				datasetFileCount = icatClient.getDatasetFileCount(datasetId);
+			}
+
+			if (downloadFileCount > 0L && downloadFileCount + datasetFileCount > queueMaxFileCount) {
+				newDownload.setDownloadItems(downloadItems);
+				downloads.add(newDownload);
+				// downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
+				// jsonArrayBuilder.add(downloadId);
+
+				// part += 1L;
+				downloadFileCount = 0L;
+				downloadItems = new ArrayList<DownloadItem>();
+				// filename = formatQueuedFilename(facilityName, visitId, part);
+				newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
+			}
+
+			DownloadItem downloadItem = createDownloadItem(newDownload, datasetId, EntityType.dataset);
+			downloadItems.add(downloadItem);
+			downloadFileCount += datasetFileCount;
+		}
+		newDownload.setDownloadItems(downloadItems);
+		downloads.add(newDownload);
+		// downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
+		// jsonArrayBuilder.add(downloadId);
+		int part = 1;
+		for (Download download : downloads) {
+			String filename = formatQueuedFilename(facilityName, visitId, part, downloads.size());
+			download.setFileName(filename);
+			downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
+			jsonArrayBuilder.add(downloadId);
+			part += 1;
+		}
+
+		return Response.ok(jsonArrayBuilder.build()).build();
+	}
+
+	/**
+	 * Format the filename for a queued Download, possibly one part of many.
+	 * 
+	 * @param facilityName ICAT Facility.name
+	 * @param visitId      ICAT Investigation.visitId
+	 * @param part         1 indexed part of the overall request
+	 * @param size         Number of parts in the overall request
+	 * @return Formatted filename
+	 */
+	private static String formatQueuedFilename(String facilityName, String visitId, int part, int size) {
+		String partString = String.valueOf(part);
+		String sizeString = String.valueOf(size);
+		StringBuilder partBuilder = new StringBuilder();
+		while (partBuilder.length() + partString.length() < sizeString.length()) {
+			partBuilder.append("0");
+		}
+		partBuilder.append(partString);
+
+		StringBuilder filenameBuilder = new StringBuilder();
+		filenameBuilder.append(facilityName);
+		filenameBuilder.append("_");
+		filenameBuilder.append(visitId);
+		filenameBuilder.append("_part_");
+		filenameBuilder.append(partBuilder);
+		filenameBuilder.append("_of_");
+		filenameBuilder.append(sizeString);
+		return filenameBuilder.toString();
+	}
+
+	/**
+	 * Validate that the submitted transport mechanism is not null or empty.
+	 * 
+	 * @param transport Transport mechanism to use
+	 * @throws BadRequestException if null or empty
+	 */
+	private static void validateTransport(String transport) throws BadRequestException {
+		if (transport == null || transport.trim().isEmpty()) {
+			throw new BadRequestException("transport is required");
+		}
+	}
 
 	/**
 	 * Retrieves the total file size (in bytes) for any investigation, datasets or datafiles.

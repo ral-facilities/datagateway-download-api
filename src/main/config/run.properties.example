@@ -95,3 +95,7 @@ defaultFacilityName=LILS
 # but queued requests will only be started when there are less than this many RESTORING downloads.
 # Negative values will start all queued jobs immediately, regardless of load.
 queue.maxActiveDownloads = 10
+# Limit the number files per queued Download part. Multiple Datasets will be combined into part
+# Downloads based on their fileCount up to this limit. If a single Dataset has a fileCount
+# greater than this limit, it will still be submitted in a part by itself.
+queue.maxFileCount = 10000
