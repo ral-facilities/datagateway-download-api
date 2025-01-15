@@ -113,15 +113,13 @@ public class DownloadRepository {
 	 *                           the request.
 	 */
 	public List<DownloadStatus> getStatuses(String userName, List<Long> downloadIds) throws NotFoundException {
-		StringBuilder stringBuilder = new StringBuilder();
-		Iterator<Long> downloadIdIterator = downloadIds.iterator();
-		stringBuilder.append(downloadIdIterator.next());
-		downloadIdIterator.forEachRemaining(downloadId -> {
-			stringBuilder.append(",");
-			stringBuilder.append(downloadId);
-		});
+		List<String> stringDownloadIds = new ArrayList<>();
+		for (Long downloadId : downloadIds) {
+			stringDownloadIds.add(downloadId.toString());
+		}
+		String joinedDownloadIds = String.join(",", stringDownloadIds);
 		String queryString = "SELECT download.status FROM Download download WHERE download.userName = '" + userName;
-		queryString += "' AND download.id IN (" + stringBuilder.toString() + ")";
+		queryString += "' AND download.id IN (" + joinedDownloadIds + ")";
 		TypedQuery<DownloadStatus> query = em.createQuery(queryString, DownloadStatus.class);
 		List<DownloadStatus> resultList = query.getResultList();
 

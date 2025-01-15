@@ -341,20 +341,15 @@ public class UserResourceTest {
 	public void testGetDownloadNotFound() throws MalformedURLException, TopcatException, ParseException {
 		List<Long> downloadIds = new ArrayList<>();
 		try {
-			Download download = new Download();
-			download.setFacilityName("LILS");
-			download.setUserName("simple/notroot");
-			download.setTransport("http");
-			download.setFileName("fileName");
-			download.setSessionId(sessionId);
-			download.setStatus(DownloadStatus.COMPLETE);
-			download = downloadRepository.save(download);
+			Download download = TestHelpers.createDummyDownload("simple/notroot", null, "http", true,
+					DownloadStatus.COMPLETE, false, downloadRepository);
+
 			downloadIds.add(download.getId());
 			ThrowingRunnable runnable = () -> userResource.getDownloadStatuses("LILS", sessionId, downloadIds);
 			assertThrows(NotFoundException.class, runnable);
 		} finally {
 			downloadIds.forEach(downloadId -> {
-				downloadRepository.removeDownload(downloadId);
+				TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
 			});
 		}
 	}
@@ -363,20 +358,18 @@ public class UserResourceTest {
 	public void testGetDownloadStatuses() throws MalformedURLException, TopcatException, ParseException {
 		List<Long> downloadIds = new ArrayList<>();
 		try {
-			Download download = new Download();
-			download.setFacilityName("LILS");
-			download.setUserName("simple/root");
-			download.setTransport("http");
-			download.setFileName("fileName");
-			download.setSessionId(sessionId);
-			download.setStatus(DownloadStatus.COMPLETE);
-			download = downloadRepository.save(download);
-			downloadIds.add(download.getId());
+			Download download1 = TestHelpers.createDummyDownload("simple/root", null, "http", true,
+					DownloadStatus.COMPLETE, false, downloadRepository);
+			Download download2 = TestHelpers.createDummyDownload("simple/root", null, "http", true,
+					DownloadStatus.RESTORING, false, downloadRepository);
+
+			downloadIds.add(download1.getId());
+			downloadIds.add(download2.getId());
 			Response response = userResource.getDownloadStatuses("LILS", sessionId, downloadIds);
-			assertEquals(Arrays.asList(DownloadStatus.COMPLETE), response.getEntity());
+			assertEquals(Arrays.asList(DownloadStatus.COMPLETE, DownloadStatus.RESTORING), response.getEntity());
 		} finally {
 			downloadIds.forEach(downloadId -> {
-				downloadRepository.removeDownload(downloadId);
+				TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
 			});
 		}
 	}
