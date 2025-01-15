@@ -75,7 +75,7 @@ public class StatusCheck {
       Properties properties = Properties.getInstance();
       int pollDelay = Integer.valueOf(properties.getProperty("poll.delay", "600"));
       int pollIntervalWait = Integer.valueOf(properties.getProperty("poll.interval.wait", "600"));
-      int maxActiveDownloads = Integer.valueOf(properties.getProperty("queue.maxActiveDownloads", "0"));
+      int maxActiveDownloads = Integer.valueOf(properties.getProperty("queue.maxActiveDownloads", "1"));
 
       // For testing, separate out the poll body into its own method
       // And allow test configurations to disable scheduled status checks
@@ -287,6 +287,7 @@ public class StatusCheck {
    */
   public void startQueuedDownloads(int maxActiveDownloads) throws Exception {
     if (maxActiveDownloads == 0) {
+      logger.debug("Preparing of queued jobs disabled by config, skipping");
       return;
     }
 
@@ -300,6 +301,8 @@ public class StatusCheck {
       List<Download> activeDownloads = activeDownloadsQuery.getResultList();
       maxActiveDownloads -= activeDownloads.size();
       if (maxActiveDownloads <= 0) {
+        String format = "More downloads currently RESTORING {} than maxActiveDownloads {}, cannot prepare queued jobs";
+        logger.info(format, activeDownloads.size(), maxActiveDownloads);
         return;
       }
     }
@@ -310,12 +313,14 @@ public class StatusCheck {
     List<Download> queuedDownloads = queuedDownloadsQuery.getResultList();
 
     if (maxActiveDownloads <= 0) {
+      logger.info("Preparing {} queued downloads", queuedDownloads.size());
       // No limits on how many to submit
       for (Download queuedDownload : queuedDownloads) {
         queuedDownload.setStatus(DownloadStatus.PREPARING);
         prepareDownload(queuedDownload, null);
       }
     } else {
+      logger.info("Preparing up to {} queued downloads", maxActiveDownloads);
       HashMap<Integer, List<Download>> mapping = new HashMap<>();
       for (Download queuedDownload : queuedDownloads) {
         String icatUrl = FacilityMap.getInstance().getIcatUrl(queuedDownload.getFacilityName());
@@ -335,7 +340,10 @@ public class StatusCheck {
           mapping.get(priority).add(queuedDownload);
         }
       }
-      List<Integer> keyList = Arrays.asList((Integer[]) mapping.keySet().toArray());
+      List<Integer> keyList = new ArrayList<>();
+      for (Object key : mapping.keySet().toArray()) {
+        keyList.add((Integer) key);
+      }
       Collections.sort(keyList);
       for (int key : keyList) {
         // Prepare from mapping in priority order

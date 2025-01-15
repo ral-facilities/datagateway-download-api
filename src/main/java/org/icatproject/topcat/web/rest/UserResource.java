@@ -62,6 +62,7 @@ public class UserResource {
 	private CacheRepository cacheRepository;
 
 	private String anonUserName;
+	private String defaultPlugin;
 	private long queueMaxFileCount;
 
 	@PersistenceContext(unitName = "topcat")
@@ -70,6 +71,7 @@ public class UserResource {
 	public UserResource() {
 		Properties properties = Properties.getInstance();
 		this.anonUserName = properties.getProperty("anonUserName", "");
+		this.defaultPlugin = properties.getProperty("defaultPlugin", "simple");
 		this.queueMaxFileCount = Long.valueOf(properties.getProperty("queue.maxFileCount", "10000"));
     }
 
@@ -83,6 +85,41 @@ public class UserResource {
 		} else {
 			return userName;
 		}
+	}
+
+	/**
+	 * Login to create a session
+	 * 
+	 * @param facilityName A facility name - properties must map this to a url to a valid ICAT REST api, if set.
+	 * 					   Can be null iff one Facility set in the config for the API.
+	 * @param username     ICAT username
+	 * @param password     Password for the specified authentication plugin
+	 * @param plugin       ICAT authentication plugin. If null, a default value will be used.
+	 * @return json with sessionId of the form
+	 *         <samp>{"sessionId","0d9a3706-80d4-4d29-9ff3-4d65d4308a24"}</samp>
+	 * @throws BadRequestException
+	 */
+	@POST
+	@Path("/session")
+	public String login(@QueryParam("facilityName") String facilityName, @FormParam("username") String username, @FormParam("password") String password, @FormParam("plugin") String plugin) throws BadRequestException {
+		if (plugin == null) {
+			plugin = defaultPlugin;
+		}
+		String icatUrl = getIcatUrl(facilityName);
+		IcatClient icatClient = new IcatClient(icatUrl);
+
+		JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
+		JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+		JsonObjectBuilder usernameBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder passwordBuilder = Json.createObjectBuilder();
+		usernameBuilder.add("username", username);
+		passwordBuilder.add("password", password);
+		arrayBuilder.add(usernameBuilder);
+		arrayBuilder.add(passwordBuilder);
+		objectBuilder.add("plugin", plugin);
+		objectBuilder.add("credentials", arrayBuilder);
+
+		return icatClient.login("json=" + objectBuilder.build().toString());
 	}
 
 	/**
@@ -262,6 +299,9 @@ public class UserResource {
 		if (!download.getUserName().equals(cartUserName)) {
 			throw new ForbiddenException("you do not have permission to delete this download");
 		}
+        if (download.getPreparedId() == null && download.getStatus().equals(DownloadStatus.PAUSED)) {
+            throw new ForbiddenException("Cannot modify status of a queued download");
+        }
 
         download.setStatus(DownloadStatus.valueOf(value));
         if(value.equals("COMPLETE")){
@@ -1067,7 +1107,6 @@ public class UserResource {
 	}
 	
 	private String getIcatUrl( String facilityName ) throws BadRequestException{
-		testFacilityName( facilityName, "getIcatUrl" );
 		try {
 			return FacilityMap.getInstance().getIcatUrl(facilityName);
 		} catch (InternalException ie){
@@ -1076,7 +1115,6 @@ public class UserResource {
 	}
 
 	private String getIdsUrl( String facilityName ) throws BadRequestException{
-		testFacilityName( facilityName, "getIdsUrl" );
 		try {
 			return FacilityMap.getInstance().getIdsUrl(facilityName);
 		} catch (InternalException ie){
@@ -1085,23 +1123,10 @@ public class UserResource {
 	}
 
 	private String getDownloadUrl( String facilityName, String downloadType ) throws BadRequestException{
-		testFacilityName( facilityName, "getDownloadUrl" );
 		try {
 			return FacilityMap.getInstance().getDownloadUrl(facilityName, downloadType);
 		} catch (InternalException ie){
 			throw new BadRequestException( ie.getMessage() );
 		}
 	}
-	
-	private void testFacilityName( String facilityName, String methodName ) throws BadRequestException{
-		if( facilityName == null ){
-			// Most likely an old-style API request using icat/idsUrl
-			// rather than facilityName; so log and raise a specific error here.
-			String message = "UserResource." + methodName + ": facilityName is null. Perhaps request is using old API?";
-			logger.error( message );
-			throw new BadRequestException( message );
-		}
-	}
-
-
 }

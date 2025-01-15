@@ -808,6 +808,39 @@ public class StatusCheckTest {
 		Long downloadId2 = null;
 		try {
 			String transport = "http";
+			Download dummyDownload1 = createDummyDownload(null, transport, true, DownloadStatus.PAUSED, false);
+			Download dummyDownload2 = createDummyDownload(null, transport, true, DownloadStatus.PAUSED, false);
+			downloadId1 = dummyDownload1.getId();
+			downloadId2 = dummyDownload2.getId();
+
+			statusCheck.startQueuedDownloads(1);
+
+			// Should schedule only the first download, but because it has a dummy
+			// (non-UUID) sessionId when prepareData is called it will throw and then mark
+			// the Download as EXPIRED as part of the error handling. This is OK, as it
+			// still indicates startQueuedDownloads called prepareData
+
+			Download postDownload1 = getDummyDownload(downloadId1);
+			Download postDownload2 = getDummyDownload(downloadId2);
+
+			assertEquals(DownloadStatus.EXPIRED, postDownload1.getStatus());
+			assertNull(postDownload1.getPreparedId());
+			assertEquals(DownloadStatus.PAUSED, postDownload2.getStatus());
+			assertNull(postDownload2.getPreparedId());
+		} finally {
+			// clean up
+			deleteDummyDownload(downloadId1);
+			deleteDummyDownload(downloadId2);
+		}
+	}
+
+	@Test
+	@Transactional
+	public void testStartQueuedDownloadsNonZeroRestoringDownload() throws Exception {
+		Long downloadId1 = null;
+		Long downloadId2 = null;
+		try {
+			String transport = "http";
 			Download dummyDownload1 = createDummyDownload("preparedId", transport, true, DownloadStatus.RESTORING,
 					false);
 			Download dummyDownload2 = createDummyDownload(null, transport, true, DownloadStatus.PAUSED, false);
@@ -825,7 +858,7 @@ public class StatusCheckTest {
 			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
 			assertNotNull("Expected RESTORING Download to still have preparedId set", postDownload1.getPreparedId());
 			assertEquals(DownloadStatus.PAUSED, postDownload2.getStatus());
-			assertNull("Expected PAUSED Download to now have preparedId set", postDownload2.getPreparedId());
+			assertNull("Expected PAUSED Download to not have preparedId set", postDownload2.getPreparedId());
 		} finally {
 			// clean up
 			deleteDummyDownload(downloadId1);

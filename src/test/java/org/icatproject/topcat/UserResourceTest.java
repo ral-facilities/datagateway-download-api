@@ -21,6 +21,8 @@ import jakarta.ejb.EJB;
 
 import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.domain.*;
+import org.icatproject.topcat.exceptions.ForbiddenException;
+
 import java.net.URLEncoder;
 
 import org.icatproject.topcat.repository.CacheRepository;
@@ -76,12 +78,23 @@ public class UserResourceTest {
 	@Before
 	public void setup() throws Exception {
 		HttpClient httpClient = new HttpClient("https://localhost:8181/icat");
-		String data = "json=" + URLEncoder.encode(
+		String loginData = "json=" + URLEncoder.encode(
 				"{\"plugin\":\"simple\", \"credentials\":[{\"username\":\"root\"}, {\"password\":\"pw\"}]}", "UTF8");
-		String response = httpClient.post("session", new HashMap<String, String>(), data).toString();
+		String response = httpClient.post("session", new HashMap<String, String>(), loginData).toString();
 		sessionId = Utils.parseJsonObject(response).getString("sessionId");
 
 		connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/icatdb", "icatdbuser", "icatdbuserpw");
+	}
+
+	@Test
+	public void testLogin() throws Exception {
+		String loginResponseString = userResource.login(null, "root", "pw", null);
+		JsonObject loginResponseObject = Utils.parseJsonObject(loginResponseString);
+
+		assertEquals(loginResponseObject.toString(), 1, loginResponseObject.keySet().size());
+		assertTrue(loginResponseObject.containsKey("sessionId"));
+		// Will throw if not a UUID
+		UUID.fromString(loginResponseObject.getString("sessionId"));
 	}
 
 	@Test
@@ -156,9 +169,7 @@ public class UserResourceTest {
 		long entityId = dataset.getInt("id");
 
 		// Get the initial state of the downloads - may not be empty
-		// It appears queryOffset cannot be empty!
-		String queryOffset = "1 = 1";
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 
 		downloads = (List<Download>) response.getEntity();
@@ -188,7 +199,7 @@ public class UserResourceTest {
 		assertTrue(downloadId > 0);
 
 		// Now, there should be one download, whose downloadId matches
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 
 		// Doesn't parse as JSON, try a direct cast
@@ -229,7 +240,7 @@ public class UserResourceTest {
 
 		// and test that the new status has been set
 
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 		downloads = (List<Download>) response.getEntity();
 
@@ -247,7 +258,7 @@ public class UserResourceTest {
 		// and check that it has worked (again, not bothering to check that nothing else
 		// has changed)
 
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 		downloads = (List<Download>) response.getEntity();
 
@@ -326,6 +337,38 @@ public class UserResourceTest {
 			}
 		} finally {
 			for (long downloadId : downloadIds) {
+				downloadRepository.removeDownload(downloadId);
+			}
+		}
+	}
+
+	public void testSetDownloadStatus() throws Exception {
+		Long downloadId = null;
+		try {
+			Download testDownload = new Download();
+			String facilityName = "LILS";
+			testDownload.setFacilityName(facilityName);
+			testDownload.setSessionId(sessionId);
+			testDownload.setStatus(DownloadStatus.PAUSED);
+			testDownload.setIsDeleted(false);
+			testDownload.setUserName("simple/root");
+			testDownload.setFileName("testFile.txt");
+			testDownload.setTransport("http");
+			downloadRepository.save(testDownload);
+			downloadId = testDownload.getId();
+	
+			assertThrows("Cannot modify status of a queued download", ForbiddenException.class, () -> {
+				userResource.setDownloadStatus(testDownload.getId(), facilityName, sessionId, DownloadStatus.RESTORING.toString());
+			});
+	
+			Response response = userResource.getDownloads(facilityName, sessionId, null);
+			assertEquals(200, response.getStatus());
+			List<Download> downloads = (List<Download>) response.getEntity();
+	
+			Download unmodifiedDownload = findDownload(downloads, downloadId);
+			assertEquals(DownloadStatus.PAUSED, unmodifiedDownload.getStatus());
+		} finally {
+			if (downloadId != null) {
 				downloadRepository.removeDownload(downloadId);
 			}
 		}
