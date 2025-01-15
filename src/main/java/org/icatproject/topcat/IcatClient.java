@@ -230,9 +230,26 @@ public class IcatClient {
 	 * @throws TopcatException
 	 */
 	public JsonObject getEntity(String entityType) throws TopcatException {
+		return getEntities(entityType, 1L).get(0);
+	}
+
+
+	/**
+	 * Gets multiple Entities of the specified type, without any other conditions.
+	 * 
+	 * NOTE: This function is written and intended for getting Investigation,
+	 * Dataset or Datafile entities as part of the tests. It does not handle casing of
+	 * entities containing multiple words, or querying for a specific instance of an
+	 * entity.
+	 * 
+	 * @param entityType Type of ICAT Entity to get
+	 * @return A ICAT Entities of the specified type as JsonObjects
+	 * @throws TopcatException
+	 */
+	public List<JsonObject> getEntities(String entityType, long limit) throws TopcatException {
 		try {
 			String entityCapital = StringUtils.capitalize(entityType.toLowerCase());
-			String query = URLEncoder.encode("SELECT o FROM " + entityCapital + " o LIMIT 0, 1", "UTF8");
+			String query = URLEncoder.encode("SELECT o FROM " + entityCapital + " o LIMIT 0, " + limit, "UTF8");
 			String url = "entityManager?sessionId="  + URLEncoder.encode(sessionId, "UTF8") + "&query=" + query;
 			Response response = httpClient.get(url, new HashMap<String, String>());
 			if(response.getCode() == 404){
@@ -240,8 +257,11 @@ public class IcatClient {
 			} else if(response.getCode() >= 400){
 				throw new BadRequestException(Utils.parseJsonObject(response.toString()).getString("message"));
 			}
-			JsonObject entity = Utils.parseJsonArray(response.toString()).getJsonObject(0);
-			return entity.getJsonObject(entityCapital);
+			List<JsonObject> entities = new ArrayList<>();
+			for (JsonValue entity : Utils.parseJsonArray(response.toString())) {
+				entities.add(((JsonObject) entity).getJsonObject(entityCapital));
+			}
+			return entities;
 		} catch (TopcatException e){
 			throw e;
 		} catch (Exception e) {
