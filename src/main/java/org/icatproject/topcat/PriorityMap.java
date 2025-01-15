@@ -60,20 +60,21 @@ public class PriorityMap {
      * @param authenticatedString The value read from the run.properties file
      */
     private void setAuthenticatedPriority(String authenticatedString) {
+        String msg = "";
         authenticatedPriority = Integer.valueOf(authenticatedString);
         if (authenticatedPriority < 1 && defaultPriority >= 1) {
-            String msg = "queue.priority.authenticated disabled with value " + authenticatedString;
+            msg += "queue.priority.authenticated disabled with value " + authenticatedString;
             msg += " but queue.priority.default enabled with value " + defaultPriority;
-            msg += "\nAuthenticated users will use default priority if no superseding priority applies";
             logger.warn(msg);
             authenticatedPriority = defaultPriority;
         } else if (authenticatedPriority >= 1 && authenticatedPriority > defaultPriority) {
-            String msg = "queue.priority.authenticated enabled with value " + authenticatedString;
+            msg += "queue.priority.authenticated enabled with value " + authenticatedString;
             msg += " but queue.priority.default supersedes with value " + defaultPriority;
-            msg += "\nAuthenticated users will use default priority if no superseding priority applies";
-            logger.warn(msg);
-            authenticatedPriority = defaultPriority;
+        } else {
+            return;  // Explicit authenticatedPriority OK, so no need to warn or use defaultPriority 
         }
+        logger.warn(msg + "\nAuthenticated users will use default priority if no superseding priority applies");
+        authenticatedPriority = defaultPriority;
     }
 
     /**
