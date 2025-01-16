@@ -2,6 +2,9 @@ package org.icatproject.topcat;
 
 import java.net.URL;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -273,9 +276,13 @@ public class StatusCheck {
   }
   
   /**
-   * Prepares Downloads which are queued (PAUSED with no preparedId) up to the maxActiveDownloads limit.
+   * Prepares Downloads which are queued (PAUSED with no preparedId) up to the
+   * maxActiveDownloads limit.
+   * Downloads will be prepared in order of priority, with all Downloads from
+   * Users with a value of 1 being prepared first, then 2 and so on.
    * 
-   * @param maxActiveDownloads Limit on the number of concurrent jobs with RESTORING status
+   * @param maxActiveDownloads Limit on the number of concurrent jobs with
+   *                           RESTORING status
    * @throws Exception
    */
   public void startQueuedDownloads(int maxActiveDownloads) throws Exception {
@@ -288,29 +295,68 @@ public class StatusCheck {
     String restoringCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.RESTORING";
     String pausedCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.PAUSED";
 
-    String activeQueryString = selectString + " and " + restoringCondition;
-    TypedQuery<Download> activeDownloadsQuery = em.createQuery(activeQueryString, Download.class);
-    List<Download> activeDownloads = activeDownloadsQuery.getResultList();
-
-    String queuedQueryString = selectString + " and " + pausedCondition + " and download.preparedId = null";
-    queuedQueryString += " order by download.createdAt";
-    TypedQuery<Download> queuedDownloadsQuery = em.createQuery(queuedQueryString, Download.class);
     if (maxActiveDownloads > 0) {
-      int freeActiveDownloads = maxActiveDownloads - activeDownloads.size();
-      if (freeActiveDownloads <= 0) {
+      String activeQueryString = selectString + " and " + restoringCondition;
+      TypedQuery<Download> activeDownloadsQuery = em.createQuery(activeQueryString, Download.class);
+      List<Download> activeDownloads = activeDownloadsQuery.getResultList();
+      maxActiveDownloads -= activeDownloads.size();
+      if (maxActiveDownloads <= 0) {
         String format = "More downloads currently RESTORING {} than maxActiveDownloads {}, cannot prepare queued jobs";
         logger.info(format, activeDownloads.size(), maxActiveDownloads);
         return;
       }
-      queuedDownloadsQuery.setMaxResults(freeActiveDownloads);
     }
 
+    String queuedQueryString = selectString + " and " + pausedCondition + " and download.preparedId = null";
+    queuedQueryString += " order by download.createdAt";
+    TypedQuery<Download> queuedDownloadsQuery = em.createQuery(queuedQueryString, Download.class);
     List<Download> queuedDownloads = queuedDownloadsQuery.getResultList();
-    
-    logger.info("Preparing {} queued downloads", queuedDownloads.size());
-    for (Download queuedDownload : queuedDownloads) {
-      queuedDownload.setStatus(DownloadStatus.PREPARING);
-      prepareDownload(queuedDownload, null);
+
+    if (maxActiveDownloads <= 0) {
+      logger.info("Preparing {} queued downloads", queuedDownloads.size());
+      // No limits on how many to submit
+      for (Download queuedDownload : queuedDownloads) {
+        queuedDownload.setStatus(DownloadStatus.PREPARING);
+        prepareDownload(queuedDownload, null);
+      }
+    } else {
+      logger.info("Preparing up to {} queued downloads", maxActiveDownloads);
+      HashMap<Integer, List<Download>> mapping = new HashMap<>();
+      for (Download queuedDownload : queuedDownloads) {
+        String icatUrl = FacilityMap.getInstance().getIcatUrl(queuedDownload.getFacilityName());
+        IcatClient icatClient = new IcatClient(icatUrl, queuedDownload.getSessionId());
+        int priority = icatClient.getQueuePriority(queuedDownload.getUserName());
+        if (priority == 1) {
+          // Highest priority, prepare now
+          queuedDownload.setStatus(DownloadStatus.PREPARING);
+          prepareDownload(queuedDownload, null);
+          maxActiveDownloads -= 1;
+          if (maxActiveDownloads <= 0) {
+            return;
+          }
+        } else {
+          // Lower priority, add to mapping
+          mapping.putIfAbsent(priority, new ArrayList<>());
+          mapping.get(priority).add(queuedDownload);
+        }
+      }
+      List<Integer> keyList = new ArrayList<>();
+      for (Object key : mapping.keySet().toArray()) {
+        keyList.add((Integer) key);
+      }
+      Collections.sort(keyList);
+      for (int key : keyList) {
+        // Prepare from mapping in priority order
+        List<Download> downloadList = mapping.get(key);
+        for (Download download : downloadList) {
+          download.setStatus(DownloadStatus.PREPARING);
+          prepareDownload(download, null);
+          maxActiveDownloads -= 1;
+          if (maxActiveDownloads <= 0) {
+            return;
+          }
+        }
+      }
     }
   }
 

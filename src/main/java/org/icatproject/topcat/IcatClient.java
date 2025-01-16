@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 
@@ -339,6 +340,60 @@ public class IcatClient {
 		}
 
 		return out;
+	}
+
+	/**
+	 * @param userName ICAT User.name to check for access to the queue
+	 * @throws TopcatException If the user has a non-positive priority value (or
+	 *                         another internal error is triggered)
+	 */
+	public void checkQueueAllowed(String userName) throws TopcatException {
+		if (getQueuePriority(userName) < 1) {
+			throw new ForbiddenException("Queuing Downloads forbidden");
+		}
+	}
+
+	/**
+	 * If explicitly set via InstrumentScientist or InvestigationUser mappings,
+	 * the highest priority (lowest value) will be returned.
+	 * Otherwise, if authenticated, the authenticated user default will be returned.
+	 * Otherwise, global default will be returned.
+	 * 
+	 * @param userName ICAT User.name to determine the queue priority of
+	 * @return int representing the queue priority. <1 indicates disabled, >=1
+	 *         indicates enabled with higher values having lower priority.
+	 * @throws TopcatException
+	 */
+	public int getQueuePriority(String userName) throws TopcatException {
+		PriorityMap priorityMap = PriorityMap.getInstance();
+		HashMap<Integer, String> mapping = priorityMap.getMapping();
+		List<Integer> keyList = new ArrayList<>(mapping.keySet());
+		Collections.sort(keyList);
+		for (Integer priority : keyList) {
+			if (checkUser(userName, mapping.get(priority)) > 0) {
+				return priority;
+			}
+		}
+
+		if (!userName.equals(Properties.getInstance().getProperty("anonUserName"))) {
+			return priorityMap.getAuthenticatedPriority();
+		} else {
+			return priorityMap.getDefaultPriority();
+		}
+	}
+
+	/**
+	 * @param userName  ICAT User.name to determine the queue priority of
+	 * @param condition JPQL condition representing the possible ways a user can
+	 *                  have priority
+	 * @return size of the results, 0 means use did not have priority, 1 means they
+	 *         did
+	 * @throws TopcatException
+	 */
+	int checkUser(String userName, String condition) throws TopcatException {
+		String query = "SELECT user FROM User user WHERE user.name = '" + userName + "' AND (" + condition + ")";
+		JsonArray results = submitQuery(query);
+		return results.size();
 	}
 
 	protected String[] getAdminUserNames() throws Exception {
