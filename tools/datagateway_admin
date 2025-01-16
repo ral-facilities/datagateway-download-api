@@ -288,6 +288,79 @@ def manage_download_types():
 			}, verify=verifySsl).text)
 		download_statuses[option_number] = download_status
 
+
+def queue_visit():
+	transport = input("Enter transport mechanism: ")
+	email = input("Enter email to notify upon completion: ")
+	visit_id = input("Enter visit id: ")
+	data = {
+		"facilityName": facility_name,
+		"sessionId": session_id,
+		"transport": transport,
+		"email": email,
+		"visitId": visit_id,
+	}
+	url = topcat_url + "/queue/" + facility_name +  "/visit"
+	print(requests.post(url=url, data=data, verify=verifySsl).text)
+
+
+def queue_files():
+	transport = input("Enter transport mechanism: ")
+	email = input("Enter email to notify upon completion: ")
+	local_file = input("Enter path to local file containing newline delimited file locations: ")
+	with open(local_file) as f:
+		files = f.readlines()
+
+	data = {
+		"facilityName": facility_name,
+		"sessionId": session_id,
+		"transport": transport,
+		"email": email,
+		"files": files,
+	}
+	url = topcat_url + "/queue/" + facility_name +  "/files"
+	print(requests.post(url=url, data=data, verify=verifySsl).text)
+
+
+
+def get_all_queued_downloads():
+	query_offset = "WHERE download.isDeleted != true"
+	query_offset += " AND download.status = org.icatproject.topcat.domain.DownloadStatus.PAUSED"
+	query_offset += " AND download.preparedId = null"
+	params = {
+		"facilityName": facility_name,
+		"sessionId": session_id,
+		"queryOffset": query_offset,
+	}
+	return requests.get(topcat_url + "/admin/downloads", params=params, verify=verifySsl).text
+
+
+def prepare_download(download_id):
+	data = {
+		"facilityName": facility_name,
+		"sessionId": session_id,
+		"value": "PREPARING"
+	}
+	url = topcat_url + "/admin/download/" + download_id +  "/status"
+	requests.put(url=url, data=data, verify=verifySsl)
+
+
+def show_all_queued_downloads():
+	print(get_all_queued_downloads())
+
+
+def start_queued_download():
+	download_id = input("Enter download id: ")
+	prepare_download(download_id=download_id)
+
+
+def start_queued_downloads():
+	text = get_all_queued_downloads()
+	downloads = json.loads(text)
+	for download in  downloads:
+		prepare_download(str(download["id"]))
+
+
 while True:
 	print("")
 	print("What do you want to do?")
@@ -297,7 +370,12 @@ while True:
 	print(" * 4: Set a download status to 'EXPIRED'.")
 	print(" * 5: Expire all pending downloads.")
 	print(" * 6: Enable or disable download types.")
-	print(" * 7: Exit")
+	print(" * 7: Queue visit.")
+	print(" * 8: Queue files.")
+	print(" * 9: Show all queued downloads.")
+	print(" * 10: Start a queued download.")
+	print(" * 11: Start all queued downloads.")
+	print(" * 12: Exit")
 
 	option_number = input("Enter option number: ");
 
@@ -315,6 +393,16 @@ while True:
 	elif option_number == "6":
 		manage_download_types()
 	elif option_number == "7":
+		queue_visit()
+	elif option_number == "8":
+		queue_files()
+	elif option_number == "9":
+		show_all_queued_downloads()
+	elif option_number == "10":
+		start_queued_download()
+	elif option_number == "11":
+		start_queued_downloads()
+	elif option_number == "12":
 		break
 	else:
 		print("")
