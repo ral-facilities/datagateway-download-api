@@ -163,13 +163,13 @@ public class StatusCheckTest {
 			// REMEMBER: dummyDownload.email is null, so it should be excluded by the query
 			// in updateStatuses()
 
-			Download postDownload = getDummyDownload(downloadId);
+			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.COMPLETE, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId);
+			TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
 		}
 	}
 
@@ -206,7 +206,7 @@ public class StatusCheckTest {
 
 			// Download status should now be RESTORING, no email sent.
 
-			Download postDownload = getDummyDownload(downloadId);
+			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
@@ -220,13 +220,13 @@ public class StatusCheckTest {
 			// Download should now be COMPLETE, and email flagged as sent (though it
 			// wasn't!)
 
-			postDownload = getDummyDownload(downloadId);
+			postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.COMPLETE, postDownload.getStatus());
 			assertTrue(postDownload.getIsEmailSent());
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId);
+			TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
 		}
 	}
 
@@ -264,7 +264,7 @@ public class StatusCheckTest {
 
 			// Download status should now be RESTORING, no email sent.
 
-			Download postDownload = getDummyDownload(downloadId);
+			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
@@ -279,7 +279,7 @@ public class StatusCheckTest {
 
 			// Download still be RESTORING, and email still not sent
 
-			postDownload = getDummyDownload(downloadId);
+			postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
@@ -298,13 +298,13 @@ public class StatusCheckTest {
 
 			statusCheck.updateStatuses(pollDelay, pollIntervalWait, mockIdsClient);
 
-			postDownload = getDummyDownload(completeDownloadId);
+			postDownload = TestHelpers.getDummyDownload(completeDownloadId, downloadRepository);
 			assertEquals(DownloadStatus.COMPLETE, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId);
-			deleteDummyDownload(completeDownloadId);
+			TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
+			TestHelpers.deleteDummyDownload(completeDownloadId, downloadRepository);
 		}
 	}
 
@@ -349,14 +349,14 @@ public class StatusCheckTest {
 
 			// Download status should now be EXPIRED, no email sent.
 
-			Download postDownload = getDummyDownload(downloadId);
+			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.EXPIRED, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
 
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId);
+			TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
 		}
 	}
 
@@ -395,7 +395,7 @@ public class StatusCheckTest {
 
 			// Download status should now be RESTORING, no email sent.
 
-			Download postDownload = getDummyDownload(downloadId);
+			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
@@ -409,7 +409,7 @@ public class StatusCheckTest {
 
 			// Download status should not have changed
 
-			postDownload = getDummyDownload(downloadId);
+			postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
@@ -422,13 +422,13 @@ public class StatusCheckTest {
 
 			// Download should now be EXPIRED
 
-			postDownload = getDummyDownload(downloadId);
+			postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.EXPIRED, postDownload.getStatus());
 
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId);
+			TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
 		}
 	}
 
@@ -463,7 +463,7 @@ public class StatusCheckTest {
 
 			// Download status should now be RESTORING, no email sent.
 
-			Download postDownload = getDummyDownload(downloadId);
+			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
@@ -475,7 +475,7 @@ public class StatusCheckTest {
 
 			assertFalse(mockIdsClient.isPreparedWasCalled());
 
-			postDownload = getDummyDownload(downloadId);
+			postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
@@ -495,7 +495,7 @@ public class StatusCheckTest {
 			// But the status should not have changed, as isPrepared will have returned
 			// false
 
-			postDownload = getDummyDownload(downloadId);
+			postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
@@ -526,13 +526,13 @@ public class StatusCheckTest {
 			// Download should now be COMPLETE, and email flagged as sent (though it
 			// wasn't!)
 
-			postDownload = getDummyDownload(downloadId);
+			postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.COMPLETE, postDownload.getStatus());
 			assertTrue(postDownload.getIsEmailSent());
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId);
+			TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
 		}
 	}
 
@@ -549,7 +549,8 @@ public class StatusCheckTest {
 			String transport = "http";
 
 			// Create a single-tier download; initial status should be COMPLETE
-			Download dummyDownload = createDummyDownload(preparedId, transport, false, status, false);
+			Download dummyDownload = TestHelpers.createDummyDownload("DummyUserName", preparedId, transport, false,
+					status, false, downloadRepository);
 			downloadId = dummyDownload.getId();
 
 			// Not testing delays, so set to zero
@@ -563,13 +564,13 @@ public class StatusCheckTest {
 
 			assertFalse(mockIdsClient.prepareDataWasCalled());
 
-			Download postDownload = getDummyDownload(downloadId);
+			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(status, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId);
+			TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
 		}
 	}
 
@@ -599,13 +600,13 @@ public class StatusCheckTest {
 
 			assertFalse(mockIdsClient.prepareDataWasCalled());
 
-			Download postDownload = getDummyDownload(downloadId);
+			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertTrue(postDownload.getIsDeleted());
 			assertFalse(postDownload.getIsEmailSent());
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId);
+			TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
 		}
 	}
 
@@ -643,7 +644,7 @@ public class StatusCheckTest {
 
 			// Download status should now be RESTORING, no email sent.
 
-			Download postDownload = getDummyDownload(downloadId);
+			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
@@ -659,7 +660,7 @@ public class StatusCheckTest {
 
 			assertFalse(mockIdsClient.isPreparedWasCalled());
 
-			postDownload = getDummyDownload(downloadId);
+			postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
@@ -679,7 +680,7 @@ public class StatusCheckTest {
 			// But the status should not have changed, as isPrepared will have thrown an
 			// exception
 
-			postDownload = getDummyDownload(downloadId);
+			postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
@@ -711,7 +712,7 @@ public class StatusCheckTest {
 			// But the status should not have changed, as isPrepared will have thrown an
 			// exception
 
-			postDownload = getDummyDownload(downloadId);
+			postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload.getStatus());
 			assertFalse(postDownload.getIsEmailSent());
@@ -735,13 +736,13 @@ public class StatusCheckTest {
 			// Download should now be COMPLETE, and email flagged as sent (though it
 			// wasn't!)
 
-			postDownload = getDummyDownload(downloadId);
+			postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.COMPLETE, postDownload.getStatus());
 			assertTrue(postDownload.getIsEmailSent());
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId);
+			TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
 		}
 	}
 
@@ -752,8 +753,10 @@ public class StatusCheckTest {
 		Long downloadId2 = null;
 		try {
 			String transport = "http";
-			Download dummyDownload1 = createDummyDownload(null, transport, true, DownloadStatus.PAUSED, false);
-			Download dummyDownload2 = createDummyDownload(null, transport, true, DownloadStatus.PAUSED, false);
+			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
+					DownloadStatus.PAUSED, false, downloadRepository);
+			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
+					DownloadStatus.PAUSED, false, downloadRepository);
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
@@ -764,8 +767,8 @@ public class StatusCheckTest {
 			// the Downloads as EXPIRED as part of the error handling. This is OK, as it
 			// still indicates startQueuedDownloads called prepareData
 
-			Download postDownload1 = getDummyDownload(downloadId1);
-			Download postDownload2 = getDummyDownload(downloadId2);
+			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
+			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
 
 			assertEquals(DownloadStatus.EXPIRED, postDownload1.getStatus());
 			assertNull(postDownload1.getPreparedId());
@@ -773,8 +776,8 @@ public class StatusCheckTest {
 			assertNull(postDownload2.getPreparedId());
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId1);
-			deleteDummyDownload(downloadId2);
+			TestHelpers.deleteDummyDownload(downloadId1, downloadRepository);
+			TestHelpers.deleteDummyDownload(downloadId2, downloadRepository);
 		}
 	}
 
@@ -784,20 +787,21 @@ public class StatusCheckTest {
 		Long downloadId = null;
 		try {
 			String transport = "http";
-			Download dummyDownload = createDummyDownload(null, transport, true, DownloadStatus.PAUSED, false);
+			Download dummyDownload = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
+					DownloadStatus.PAUSED, false, downloadRepository);
 			downloadId = dummyDownload.getId();
 
 			statusCheck.startQueuedDownloads(0);
 
 			// Download status should still be PAUSED, as we unqueued a max of 0 downloads
 
-			Download postDownload = getDummyDownload(downloadId);
+			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
 			assertEquals(DownloadStatus.PAUSED, postDownload.getStatus());
 			assertNull(postDownload.getPreparedId());
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId);
+			TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
 		}
 	}
 
@@ -808,8 +812,10 @@ public class StatusCheckTest {
 		Long downloadId2 = null;
 		try {
 			String transport = "http";
-			Download dummyDownload1 = createDummyDownload(null, transport, true, DownloadStatus.PAUSED, false);
-			Download dummyDownload2 = createDummyDownload(null, transport, true, DownloadStatus.PAUSED, false);
+			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
+					DownloadStatus.PAUSED, false, downloadRepository);
+			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
+					DownloadStatus.PAUSED, false, downloadRepository);
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
@@ -820,8 +826,8 @@ public class StatusCheckTest {
 			// the Download as EXPIRED as part of the error handling. This is OK, as it
 			// still indicates startQueuedDownloads called prepareData
 
-			Download postDownload1 = getDummyDownload(downloadId1);
-			Download postDownload2 = getDummyDownload(downloadId2);
+			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
+			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
 
 			assertEquals(DownloadStatus.EXPIRED, postDownload1.getStatus());
 			assertNull(postDownload1.getPreparedId());
@@ -829,8 +835,8 @@ public class StatusCheckTest {
 			assertNull(postDownload2.getPreparedId());
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId1);
-			deleteDummyDownload(downloadId2);
+			TestHelpers.deleteDummyDownload(downloadId1, downloadRepository);
+			TestHelpers.deleteDummyDownload(downloadId2, downloadRepository);
 		}
 	}
 
@@ -841,9 +847,10 @@ public class StatusCheckTest {
 		Long downloadId2 = null;
 		try {
 			String transport = "http";
-			Download dummyDownload1 = createDummyDownload("preparedId", transport, true, DownloadStatus.RESTORING,
-					false);
-			Download dummyDownload2 = createDummyDownload(null, transport, true, DownloadStatus.PAUSED, false);
+			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", "preparedId", transport, true,
+					DownloadStatus.RESTORING, false, downloadRepository);
+			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
+					DownloadStatus.PAUSED, false, downloadRepository);
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
@@ -852,8 +859,8 @@ public class StatusCheckTest {
 			// Should not schedule the second Download, as we already have 1 which is
 			// RESTORING
 
-			Download postDownload1 = getDummyDownload(downloadId1);
-			Download postDownload2 = getDummyDownload(downloadId2);
+			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
+			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
 			assertNotNull("Expected RESTORING Download to still have preparedId set", postDownload1.getPreparedId());
@@ -861,80 +868,18 @@ public class StatusCheckTest {
 			assertNull("Expected PAUSED Download to not have preparedId set", postDownload2.getPreparedId());
 		} finally {
 			// clean up
-			deleteDummyDownload(downloadId1);
-			deleteDummyDownload(downloadId2);
+			TestHelpers.deleteDummyDownload(downloadId1, downloadRepository);
+			TestHelpers.deleteDummyDownload(downloadId2, downloadRepository);
 		}
 	}
 
 	private Download createDummyDownload(String preparedId, String transport, Boolean isTwoLevel, Boolean isDeleted) {
 		if (isTwoLevel) {
-			return createDummyDownload(preparedId, transport, isTwoLevel, DownloadStatus.PREPARING, isDeleted);
+			return TestHelpers.createDummyDownload("DummyUserName", preparedId, transport, isTwoLevel,
+					DownloadStatus.PREPARING, isDeleted, downloadRepository);
 		} else {
-			return createDummyDownload(preparedId, transport, isTwoLevel, DownloadStatus.COMPLETE, isDeleted);
-		}
-	}
-
-	private Download createDummyDownload(String preparedId, String transport, Boolean isTwoLevel,
-			DownloadStatus downloadStatus, Boolean isDeleted) {
-
-		// This mocks what UserResource.submitCart() might do.
-
-		String facilityName = "LILS";
-		String sessionId = "DummySessionId";
-		String fileName = "DummyFilename";
-		String userName = "DummyUsername";
-		String fullName = "Dummy Full Name";
-		// Note: setting email to null means we won't exercise (or test!) the
-		// mail-sending code
-		String email = null;
-
-		Download download = new Download();
-		download.setSessionId(sessionId);
-		download.setFacilityName(facilityName);
-		download.setFileName(fileName);
-		download.setUserName(userName);
-		download.setFullName(fullName);
-		download.setTransport(transport);
-		download.setEmail(email);
-		download.setIsEmailSent(false);
-		download.setSize(0);
-		download.setIsDeleted(isDeleted);
-		download.setPreparedId(preparedId);
-
-		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
-
-		for (int i = 0; i <= 2; i++) {
-			DownloadItem downloadItem = new DownloadItem();
-			downloadItem.setEntityId(10L + i);
-			downloadItem.setEntityType(EntityType.dataset);
-			downloadItem.setDownload(download);
-			downloadItems.add(downloadItem);
-		}
-
-		download.setDownloadItems(downloadItems);
-
-		download.setIsTwoLevel(isTwoLevel);
-
-		if (isTwoLevel) {
-			download.setStatus(downloadStatus);
-		} else {
-			download.setStatus(downloadStatus);
-		}
-
-		return downloadRepository.save(download);
-	}
-
-	private Download getDummyDownload(Long downloadId) {
-		try {
-			return downloadRepository.getDownload(downloadId);
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
-	private void deleteDummyDownload(Long downloadId) {
-		if (downloadId != null) {
-			downloadRepository.removeDownload(downloadId);
+			return TestHelpers.createDummyDownload("DummyUserName", preparedId, transport, isTwoLevel,
+					DownloadStatus.COMPLETE, isDeleted, downloadRepository);
 		}
 	}
 }
