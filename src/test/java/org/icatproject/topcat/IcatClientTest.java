@@ -10,6 +10,7 @@ import jakarta.json.*;
 import jakarta.ejb.EJB;
 
 import org.icatproject.topcat.httpclient.HttpClient;
+import org.icatproject.topcat.httpclient.Response;
 import org.icatproject.topcat.domain.*;
 import java.net.URLEncoder;
 
@@ -118,6 +119,93 @@ public class IcatClientTest {
 
 		assertNotNull(fullName);
 		// assertTrue(fullName.length() > 0);
+	}
+
+	@Test
+	public void testCheckUserNotFound() throws Exception {
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		String userName = "db/user66";
+		String i0Condition = "EXISTS ( SELECT o FROM InstrumentScientist o WHERE o.instrument.name='I0' AND o.user=user )";
+		String instrumentScientistCondition = "user.instrumentScientists IS NOT EMPTY";
+		String principalInvestigatorCondition = "EXISTS ( SELECT o FROM InvestigationUser o WHERE o.role='PRINCIPAL_INVESTIGATOR' AND o.user=user )";
+		String investigationUserCondition = "user.investigationUsers IS NOT EMPTY";
+		assertEquals(0, icatClient.checkUser(userName, i0Condition));
+		assertEquals(0, icatClient.checkUser(userName, instrumentScientistCondition));
+		assertEquals(0, icatClient.checkUser(userName, principalInvestigatorCondition));
+		assertEquals(0, icatClient.checkUser(userName, investigationUserCondition));
+	}
+
+	@Test
+	public void testCheckUserFound() throws Exception {
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		JsonObject user = icatClient.getEntity("User");
+		JsonObject instrument = icatClient.getEntity("Instrument");
+		JsonObject investigation = icatClient.getEntity("Investigation");
+		String userName = user.getString("name");
+		long userId = user.getJsonNumber("id").longValueExact();
+		long instrumentId = instrument.getJsonNumber("id").longValueExact();
+		long investigationId = investigation.getJsonNumber("id").longValueExact();
+		
+		HttpClient httpClient = new HttpClient("https://localhost:8181/icat");
+
+		JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+		JsonObjectBuilder instrumentScientistBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder instrumentScientistInnerBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder investigationUserBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder investigationUserInnerBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder userBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder instrumentBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder investigationBuilder = Json.createObjectBuilder();
+		
+		userBuilder.add("id", userId);
+		instrumentBuilder.add("id", instrumentId);
+		investigationBuilder.add("id", investigationId);
+		JsonObject userObject = userBuilder.build();
+
+		instrumentScientistInnerBuilder.add("user", userObject);
+		instrumentScientistInnerBuilder.add("instrument", instrumentBuilder);
+		instrumentScientistBuilder.add("InstrumentScientist", instrumentScientistInnerBuilder);
+		arrayBuilder.add(instrumentScientistBuilder);
+
+		investigationUserInnerBuilder.add("user", userObject);
+		investigationUserInnerBuilder.add("investigation", investigationBuilder);
+		investigationUserInnerBuilder.add("role", "PRINCIPAL_INVESTIGATOR");
+		investigationUserBuilder.add("InvestigationUser", investigationUserInnerBuilder);
+		arrayBuilder.add(investigationUserBuilder);
+
+		String data = "sessionId=" + sessionId + "&entities=" + arrayBuilder.build();
+		Response response = httpClient.post("entityManager", new HashMap<>(), data);
+		System.out.println(response.toString());
+		JsonArray responseArray = Utils.parseJsonArray(response.toString());
+		System.out.println(responseArray);
+		long instrumentScientistId = responseArray.getJsonNumber(0).longValueExact();
+		long investigationUserId = responseArray.getJsonNumber(1).longValueExact();
+		try {
+			String i0Condition = "EXISTS ( SELECT o FROM InstrumentScientist o WHERE o.instrument.name='I0' AND o.user=user )";
+			String instrumentScientistCondition = "user.instrumentScientists IS NOT EMPTY";
+			String principalInvestigatorCondition = "EXISTS ( SELECT o FROM InvestigationUser o WHERE o.role='PRINCIPAL_INVESTIGATOR' AND o.user=user )";
+			String investigationUserCondition = "user.investigationUsers IS NOT EMPTY";
+			assertEquals(1, icatClient.checkUser(userName, i0Condition));
+			assertEquals(1, icatClient.checkUser(userName, instrumentScientistCondition));
+			assertEquals(1, icatClient.checkUser(userName, principalInvestigatorCondition));
+			assertEquals(1, icatClient.checkUser(userName, investigationUserCondition));
+		} finally {
+			arrayBuilder = Json.createArrayBuilder();
+			instrumentScientistBuilder = Json.createObjectBuilder();
+			investigationUserBuilder = Json.createObjectBuilder();
+			instrumentScientistInnerBuilder = Json.createObjectBuilder();
+			investigationUserInnerBuilder = Json.createObjectBuilder();
+
+			instrumentScientistInnerBuilder.add("id", instrumentScientistId);
+			instrumentScientistBuilder.add("InstrumentScientist", instrumentScientistInnerBuilder);
+			arrayBuilder.add(instrumentScientistBuilder);
+
+			investigationUserInnerBuilder.add("id", investigationUserId);
+			investigationUserBuilder.add("InvestigationUser", investigationUserInnerBuilder);
+			arrayBuilder.add(investigationUserBuilder);
+
+			httpClient.delete("entityManager?sessionId=" + sessionId + "&entities=" + arrayBuilder.build(), new HashMap<>());
+		}
 	}
 
 	/*
