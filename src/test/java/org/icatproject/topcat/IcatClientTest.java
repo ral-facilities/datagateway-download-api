@@ -124,7 +124,7 @@ public class IcatClientTest {
 	@Test
 	public void testCheckUserNotFound() throws Exception {
 		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
-		String userName = "db/user66";
+		String userName = "db/test";
 		String i0Condition = "EXISTS ( SELECT o FROM InstrumentScientist o WHERE o.instrument.name='I0' AND o.user=user )";
 		String instrumentScientistCondition = "user.instrumentScientists IS NOT EMPTY";
 		String principalInvestigatorCondition = "EXISTS ( SELECT o FROM InvestigationUser o WHERE o.role='PRINCIPAL_INVESTIGATOR' AND o.user=user )";
