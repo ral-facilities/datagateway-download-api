@@ -936,6 +936,29 @@ public class UserResource {
 	}
 
 	/**
+	 * Check whether the current user is allowed to send large jobs to the queue.
+	 * 
+	 * @param facilityName ICAT Facility.name
+	 * @param sessionId    ICAT sessionId, which will identify the user
+	 * @return boolean
+	 * @throws TopcatException
+	 */
+	@GET
+	@Path("/queue/allowed")
+	public Response queueAllowed(@QueryParam("sessionId") String sessionId,
+			@QueryParam("facilityName") String facilityName) throws TopcatException {
+
+		logger.info("queueAllowed called");
+
+		String icatUrl = getIcatUrl(facilityName);
+		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
+		String userName = icatClient.getUserName();
+		int queuePriority = icatClient.getQueuePriority(userName);
+
+		return Response.ok(queuePriority > 0).build();
+	}
+
+	/**
 	 * Queue download of Datafiles by location, splitting into part Downloads if
 	 * needed.
 	 * 

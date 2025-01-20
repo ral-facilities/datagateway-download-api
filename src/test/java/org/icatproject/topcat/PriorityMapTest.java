@@ -16,6 +16,9 @@ public class PriorityMapTest {
         assertEquals(2, priorityMap.getDefaultPriority());
         assertEquals(2, priorityMap.getAuthenticatedPriority());
         assertEquals(0, priorityMap.getMapping().size());
+        long userPriority = priorityMap.getUserPriority("simple/test");
+        assertEquals(1L, userPriority);
+        assertEquals(null, priorityMap.getUserPriority("simple/fail"));
     }
 
     @Test

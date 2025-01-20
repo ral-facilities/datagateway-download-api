@@ -366,6 +366,10 @@ public class IcatClient {
 	 */
 	public int getQueuePriority(String userName) throws TopcatException {
 		PriorityMap priorityMap = PriorityMap.getInstance();
+		Integer userPriority = priorityMap.getUserPriority(userName);
+		if (userPriority != null) {
+			return userPriority;
+		}
 		HashMap<Integer, String> mapping = priorityMap.getMapping();
 		List<Integer> keyList = new ArrayList<>(mapping.keySet());
 		Collections.sort(keyList);
