@@ -300,7 +300,7 @@ def queue_visit():
 		"email": email,
 		"visitId": visit_id,
 	}
-	url = topcat_url + "/queue/" + facility_name +  "/visit"
+	url = topcat_url + "/queue/visit"
 	print(requests.post(url=url, data=data, verify=verifySsl).text)
 
 
@@ -318,7 +318,7 @@ def queue_files():
 		"email": email,
 		"files": files,
 	}
-	url = topcat_url + "/queue/" + facility_name +  "/files"
+	url = topcat_url + "/queue/files"
 	print(requests.post(url=url, data=data, verify=verifySsl).text)
 
 
