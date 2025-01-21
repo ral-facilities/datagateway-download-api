@@ -106,12 +106,14 @@ queue.maxFileCount = 10000
 # When automatically moving jobs from the queued to the PREPARING state, all Downloads
 # from Users with priority 1 will be scheduled before 2 and so on.
 # Specific individuals can be identified with their ICAT username, this will take precedence over all other settings
+# Groupings of users can be identified by the name of the Grouping
 # InstrumentScientists can either be identified for specific Instrument.names, or a global default
 # InvestigationUsers can either be identified for specific InvestigationUser.roles, or a global default
 # Authenticated Users without InstrumentScientist or InvestigationUser status will use the authenticated priority
 # Anyone who does not meet a specific priority class will use the default
 # Users meeting multiple criteria will use the highest priority available (lowest number)
 queue.priority.user = {"simple/root": 1}
+queue.priority.grouping = {"principal_beamline_scientists": 1}
 queue.priority.instrumentScientist.instruments = {"ABC": 1}
 queue.priority.instrumentScientist.default = 2
 queue.priority.investigationUser.roles = {"ABC": 3}

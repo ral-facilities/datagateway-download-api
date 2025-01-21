@@ -60,6 +60,10 @@ public class PriorityMap {
         String instrumentScientistProperty = properties.getProperty("queue.priority.instrumentScientist.instruments");
         String instrumentScientistCondition = "EXISTS ( SELECT o FROM InstrumentScientist o WHERE o.instrument.name='";
         parseObject(instrumentScientistProperty, instrumentScientistCondition);
+
+        String groupingProperty = properties.getProperty("queue.priority.grouping");
+        String groupingCondition = "EXISTS ( SELECT o FROM UserGroup o WHERE o.grouping.name='";
+        parseObject(groupingProperty, groupingCondition);
     }
 
     /**

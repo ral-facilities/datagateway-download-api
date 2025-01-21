@@ -129,10 +129,12 @@ public class IcatClientTest {
 		String instrumentScientistCondition = "user.instrumentScientists IS NOT EMPTY";
 		String principalInvestigatorCondition = "EXISTS ( SELECT o FROM InvestigationUser o WHERE o.role='PRINCIPAL_INVESTIGATOR' AND o.user=user )";
 		String investigationUserCondition = "user.investigationUsers IS NOT EMPTY";
+		String groupingCondition = "EXISTS ( SELECT o FROM UserGroup o WHERE o.grouping.name='principal_beamline_scientists' AND o.user=user )";
 		assertEquals(0, icatClient.checkUser(userName, i0Condition));
 		assertEquals(0, icatClient.checkUser(userName, instrumentScientistCondition));
 		assertEquals(0, icatClient.checkUser(userName, principalInvestigatorCondition));
 		assertEquals(0, icatClient.checkUser(userName, investigationUserCondition));
+		assertEquals(0, icatClient.checkUser(userName, groupingCondition));
 	}
 
 	@Test
@@ -153,13 +155,30 @@ public class IcatClientTest {
 		JsonObjectBuilder instrumentScientistInnerBuilder = Json.createObjectBuilder();
 		JsonObjectBuilder investigationUserBuilder = Json.createObjectBuilder();
 		JsonObjectBuilder investigationUserInnerBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder groupingInnerBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder userGroupInnerBuilder = Json.createObjectBuilder();
 		JsonObjectBuilder userBuilder = Json.createObjectBuilder();
 		JsonObjectBuilder instrumentBuilder = Json.createObjectBuilder();
 		JsonObjectBuilder investigationBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder groupingBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder userGroupBuilder = Json.createObjectBuilder();
+
+		// Need to create a Grouping first, then a UserGrouping second
+		groupingInnerBuilder.add("name", "principal_beamline_scientists");
+		groupingBuilder.add("Grouping", groupingInnerBuilder);
+		arrayBuilder.add(groupingBuilder);
+
+		String data = "sessionId=" + sessionId + "&entities=" + arrayBuilder.build();
+		Response response = httpClient.post("entityManager", new HashMap<>(), data);
+		JsonArray responseArray = Utils.parseJsonArray(response.toString());
+		long groupingId = responseArray.getJsonNumber(0).longValueExact();
+		arrayBuilder = Json.createArrayBuilder();
+		groupingBuilder = Json.createObjectBuilder();
 		
 		userBuilder.add("id", userId);
 		instrumentBuilder.add("id", instrumentId);
 		investigationBuilder.add("id", investigationId);
+		groupingBuilder.add("id", groupingId);
 		JsonObject userObject = userBuilder.build();
 
 		instrumentScientistInnerBuilder.add("user", userObject);
@@ -173,11 +192,14 @@ public class IcatClientTest {
 		investigationUserBuilder.add("InvestigationUser", investigationUserInnerBuilder);
 		arrayBuilder.add(investigationUserBuilder);
 
-		String data = "sessionId=" + sessionId + "&entities=" + arrayBuilder.build();
-		Response response = httpClient.post("entityManager", new HashMap<>(), data);
-		System.out.println(response.toString());
-		JsonArray responseArray = Utils.parseJsonArray(response.toString());
-		System.out.println(responseArray);
+		userGroupInnerBuilder.add("user", userObject);
+		userGroupInnerBuilder.add("grouping", groupingBuilder);
+		userGroupBuilder.add("UserGroup", userGroupInnerBuilder);
+		arrayBuilder.add(userGroupBuilder);
+
+		data = "sessionId=" + sessionId + "&entities=" + arrayBuilder.build();
+		response = httpClient.post("entityManager", new HashMap<>(), data);
+		responseArray = Utils.parseJsonArray(response.toString());
 		long instrumentScientistId = responseArray.getJsonNumber(0).longValueExact();
 		long investigationUserId = responseArray.getJsonNumber(1).longValueExact();
 		try {
@@ -185,16 +207,20 @@ public class IcatClientTest {
 			String instrumentScientistCondition = "user.instrumentScientists IS NOT EMPTY";
 			String principalInvestigatorCondition = "EXISTS ( SELECT o FROM InvestigationUser o WHERE o.role='PRINCIPAL_INVESTIGATOR' AND o.user=user )";
 			String investigationUserCondition = "user.investigationUsers IS NOT EMPTY";
+			String groupingCondition = "EXISTS ( SELECT o FROM UserGroup o WHERE o.grouping.name='principal_beamline_scientists' AND o.user=user )";
 			assertEquals(1, icatClient.checkUser(userName, i0Condition));
 			assertEquals(1, icatClient.checkUser(userName, instrumentScientistCondition));
 			assertEquals(1, icatClient.checkUser(userName, principalInvestigatorCondition));
 			assertEquals(1, icatClient.checkUser(userName, investigationUserCondition));
+			assertEquals(1, icatClient.checkUser(userName, groupingCondition));
 		} finally {
 			arrayBuilder = Json.createArrayBuilder();
 			instrumentScientistBuilder = Json.createObjectBuilder();
 			investigationUserBuilder = Json.createObjectBuilder();
+			groupingBuilder = Json.createObjectBuilder();
 			instrumentScientistInnerBuilder = Json.createObjectBuilder();
 			investigationUserInnerBuilder = Json.createObjectBuilder();
+			groupingInnerBuilder = Json.createObjectBuilder();
 
 			instrumentScientistInnerBuilder.add("id", instrumentScientistId);
 			instrumentScientistBuilder.add("InstrumentScientist", instrumentScientistInnerBuilder);
@@ -203,6 +229,10 @@ public class IcatClientTest {
 			investigationUserInnerBuilder.add("id", investigationUserId);
 			investigationUserBuilder.add("InvestigationUser", investigationUserInnerBuilder);
 			arrayBuilder.add(investigationUserBuilder);
+
+			groupingInnerBuilder.add("id", groupingId);
+			groupingBuilder.add("Grouping", groupingInnerBuilder);
+			arrayBuilder.add(groupingBuilder);
 
 			httpClient.delete("entityManager?sessionId=" + sessionId + "&entities=" + arrayBuilder.build(), new HashMap<>());
 		}
