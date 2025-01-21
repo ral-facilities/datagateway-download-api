@@ -358,6 +358,16 @@ public class UserResourceTest {
 		}
 	}
 
+	@Test
+	public void testQueueAllowed() throws Exception {
+		System.out.println("DEBUG testQueueAllowed");
+
+		String facilityName = "LILS";
+		Response response = userResource.queueAllowed(sessionId, facilityName);
+		assertEquals(200, response.getStatus());
+		assertEquals(true, response.getEntity());
+	}
+
 	public void testSetDownloadStatus() throws Exception {
 		Long downloadId = null;
 		try {

@@ -24,6 +24,7 @@ public class PriorityMap {
 
     private int defaultPriority;
     private int authenticatedPriority;
+    private HashMap<String, Integer> userMapping = new HashMap<>();
     private HashMap<Integer, String> mapping = new HashMap<>();
     private Logger logger = LoggerFactory.getLogger(PriorityMap.class);
 
@@ -35,6 +36,14 @@ public class PriorityMap {
 
         String authenticatedString = properties.getProperty("queue.priority.authenticated", defaultString);
         setAuthenticatedPriority(authenticatedString);
+
+        String userString = properties.getProperty("queue.priority.user", "{}");
+        JsonReader reader = Json.createReader(new ByteArrayInputStream(userString.getBytes()));
+        JsonObject object = reader.readObject();
+        for (String key : object.keySet()) {
+            int priority = object.getInt(key);
+            userMapping.put(key, priority);
+        }
 
         String property = "queue.priority.investigationUser.default";
         String investigationUserString = properties.getProperty(property, authenticatedString);
@@ -51,6 +60,10 @@ public class PriorityMap {
         String instrumentScientistProperty = properties.getProperty("queue.priority.instrumentScientist.instruments");
         String instrumentScientistCondition = "EXISTS ( SELECT o FROM InstrumentScientist o WHERE o.instrument.name='";
         parseObject(instrumentScientistProperty, instrumentScientistCondition);
+
+        String groupingProperty = properties.getProperty("queue.priority.grouping");
+        String groupingCondition = "EXISTS ( SELECT o FROM UserGroup o WHERE o.grouping.name='";
+        parseObject(groupingProperty, groupingCondition);
     }
 
     /**
@@ -127,6 +140,14 @@ public class PriorityMap {
      */
     public HashMap<Integer, String> getMapping() {
         return mapping;
+    }
+
+    /**
+     * @return The priority which applies to this named user,
+     *         or null if a specific priority is not defined
+     */
+    public Integer getUserPriority(String userName) {
+        return userMapping.get(userName);
     }
 
     /**
