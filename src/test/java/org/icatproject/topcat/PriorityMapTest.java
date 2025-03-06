@@ -1,13 +1,17 @@
 package org.icatproject.topcat;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 
+import org.icatproject.topcat.exceptions.ForbiddenException;
 import org.icatproject.topcat.exceptions.InternalException;
 import org.junit.Test;
+import org.junit.function.ThrowingRunnable;
 
 public class PriorityMapTest {
     @Test
@@ -58,5 +62,15 @@ public class PriorityMapTest {
         HashMap<Integer, String> mapping = priorityMap.getMapping();
         assertEquals(1, mapping.size());
         assertEquals(expected, mapping.get(1));
+    }
+
+    @Test
+    public void testCheckAnonDownloadEnabled() throws NoSuchFieldException, SecurityException, IllegalArgumentException, IllegalAccessException {
+        PriorityMap priorityMap = new PriorityMap();
+        Field field = PriorityMap.class.getDeclaredField("anonDownloadEnabled");
+        field.setAccessible(true);
+        field.setBoolean(priorityMap, false);
+        ThrowingRunnable runnable = () -> {priorityMap.checkAnonDownloadEnabled("anon/anon");};
+        assertThrows(ForbiddenException.class, runnable);
     }
 }
