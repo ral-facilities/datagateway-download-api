@@ -38,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.icatproject.topcat.IdsClient;
+import org.icatproject.topcat.PriorityMap;
 import org.icatproject.topcat.FacilityMap;
 import org.icatproject.topcat.IcatClient;
 import org.icatproject.topcat.Properties;
@@ -742,6 +743,8 @@ public class UserResource {
 		String icatUrl = getIcatUrl( facilityName );
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 		String userName = icatClient.getUserName();
+		PriorityMap priorityMap = PriorityMap.getInstance();
+		priorityMap.checkAnonDownloadEnabled(userName);
 		String cartUserName = getCartUserName(userName, sessionId);
 
 		logger.info("submitCart: get cart for user: " + cartUserName + ", facility: " + facilityName + "...");

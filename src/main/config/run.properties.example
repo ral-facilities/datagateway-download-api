@@ -84,6 +84,8 @@ maxCacheSize=100000
 
 # Username that corresponds with the anonymous user - this is used to make anonymous carts unique
 anonUserName=anon/anon
+# If false, anonymous users will not be able to download via any method (queued or otherwise)
+anonDownloadEnabled=True
 
 # Authentication plugin to use if it is not specified in the login request
 defaultPlugin=simple
