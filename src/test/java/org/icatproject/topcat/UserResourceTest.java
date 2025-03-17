@@ -281,7 +281,7 @@ public class UserResourceTest {
 			String transport = "http";
 			String email = "";
 			String visitId = "Proposal 0 - 0 0";
-			Response response = userResource.queueVisitId(facilityName, sessionId, transport, email, visitId);
+			Response response = userResource.queueVisitId(facilityName, sessionId, transport, null, email, visitId);
 			assertEquals(200, response.getStatus());
 	
 			JsonArray downloadIdsArray = Utils.parseJsonArray(response.getEntity().toString());
@@ -327,7 +327,7 @@ public class UserResourceTest {
 			for (JsonObject datafile : datafiles) {
 				files.add(datafile.getString("location"));
 			}
-			Response response = userResource.queueFiles(facilityName, sessionId, transport, email, files);
+			Response response = userResource.queueFiles(facilityName, sessionId, transport, null, email, files);
 			assertEquals(200, response.getStatus());
 
 			JsonArray downloadIdsArray = Utils.parseJsonArray(response.getEntity().toString());
