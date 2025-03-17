@@ -3,6 +3,7 @@ package org.icatproject.topcat;
 import java.io.ByteArrayInputStream;
 import java.util.HashMap;
 
+import org.icatproject.topcat.exceptions.ForbiddenException;
 import org.icatproject.topcat.exceptions.InternalException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,8 @@ public class PriorityMap {
         return instance;
     }
 
+    String anonUserName;
+    boolean anonDownloadEnabled;
     private int defaultPriority;
     private int authenticatedPriority;
     private HashMap<Integer, String> mapping = new HashMap<>();
@@ -30,8 +33,16 @@ public class PriorityMap {
     public PriorityMap() {
         Properties properties = Properties.getInstance();
 
-        String defaultString = properties.getProperty("queue.priority.default", "0");
-        defaultPriority = Integer.valueOf(defaultString);
+        anonUserName = properties.getProperty("anonUserName", "");
+        anonDownloadEnabled = Boolean.parseBoolean(properties.getProperty("anonDownloadEnabled", "true"));
+        String defaultString;
+        if (anonDownloadEnabled) {
+            defaultString = properties.getProperty("queue.priority.default", "0");
+            defaultPriority = Integer.valueOf(defaultString);
+        } else {
+            defaultString = "0";
+            defaultPriority = 0;
+        }
 
         String authenticatedString = properties.getProperty("queue.priority.authenticated", defaultString);
         setAuthenticatedPriority(authenticatedString);
@@ -51,6 +62,17 @@ public class PriorityMap {
         String instrumentScientistProperty = properties.getProperty("queue.priority.instrumentScientist.instruments");
         String instrumentScientistCondition = "EXISTS ( SELECT o FROM InstrumentScientist o WHERE o.instrument.name='";
         parseObject(instrumentScientistProperty, instrumentScientistCondition);
+    }
+
+    /**
+     * @param userName ICAT userName
+     * @throws ForbiddenException If userName is the anonUserName and anonDownloadEnabled is false
+     */
+    public void checkAnonDownloadEnabled(String userName) throws ForbiddenException {
+		if (userName.equals(anonUserName) && !anonDownloadEnabled) {
+			logger.warn("submitCart request denied for anonymous user");
+			throw new ForbiddenException("Downloads by anonymous users not supported");
+		}
     }
 
     /**
