@@ -868,6 +868,8 @@ public class UserResource {
 	 * @param facilityName ICAT Facility.name
 	 * @param sessionId    ICAT sessionId
 	 * @param transport    Transport mechanism to use
+	 * @param fileName     Optional name to use as the root for each individual part
+	 *                     Download. Defaults to facilityName_visitId.
 	 * @param email        Optional email to notify upon completion
 	 * @param visitId      ICAT Investigation.visitId to submit
 	 * @return Array of Download ids
@@ -877,9 +879,10 @@ public class UserResource {
 	@Path("/queue/visit")
 	public Response queueVisitId(@FormParam("facilityName") String facilityName,
 			@FormParam("sessionId") String sessionId, @FormParam("transport") String transport,
-			@FormParam("email") String email, @FormParam("visitId") String visitId) throws TopcatException {
+			@FormParam("fileName") String fileName, @FormParam("email") String email,
+			@FormParam("visitId") String visitId) throws TopcatException {
 
-		logger.info("queueVisitId called");
+		logger.info("queueVisitId called for {}", visitId);
 		validateTransport(transport);
 
 		String icatUrl = getIcatUrl(facilityName);
@@ -927,9 +930,12 @@ public class UserResource {
 		downloads.add(newDownload);
 
 		int part = 1;
+		if (fileName == null) {
+			fileName = facilityName + "_" + visitId;
+		}
 		for (Download download : downloads) {
-			String filename = formatQueuedFilename(facilityName, visitId, part, downloads.size());
-			download.setFileName(filename);
+			String partFilename = formatQueuedFilename(fileName, part, downloads.size());
+			download.setFileName(partFilename);
 			downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
 			jsonArrayBuilder.add(downloadId);
 			part += 1;
@@ -968,6 +974,8 @@ public class UserResource {
 	 * @param facilityName ICAT Facility.name
 	 * @param sessionId    ICAT sessionId
 	 * @param transport    Transport mechanism to use
+	 * @param fileName     Optional name to use as the root for each individual part
+	 *                     Download. Defaults to facilityName_visitId.
 	 * @param email        Optional email to notify upon completion
 	 * @param files        ICAT Datafile.locations to download
 	 * @return Array of Download ids
@@ -978,13 +986,14 @@ public class UserResource {
 	@Path("/queue/files")
 	public Response queueFiles(@FormParam("facilityName") String facilityName,
 			@FormParam("sessionId") String sessionId, @FormParam("transport") String transport,
-			@FormParam("email") String email, @FormParam("files") List<String> files) throws TopcatException, UnsupportedEncodingException {
+			@FormParam("fileName") String fileName, @FormParam("email") String email,
+			@FormParam("files") List<String> files) throws TopcatException, UnsupportedEncodingException {
 
-		logger.info("queueFiles called");
-		validateTransport(transport);
-		if (files.size() == 0) {
+		if (files == null || files.size() == 0) {
 			throw new BadRequestException("At least one Datafile.location required");
 		}
+		logger.info("queueFiles called for {} files", files.size());
+		validateTransport(transport);
 
 		String icatUrl = getIcatUrl(facilityName);
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
@@ -1023,9 +1032,12 @@ public class UserResource {
 		downloads.add(newDownload);
 
 		int part = 1;
+		if (fileName == null) {
+			fileName = facilityName + "_files";
+		}
 		for (Download download : downloads) {
-			String filename = formatQueuedFilename(facilityName, "files", part, downloads.size());
-			download.setFileName(filename);
+			String partFilename = formatQueuedFilename(fileName, part, downloads.size());
+			download.setFileName(partFilename);
 			downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
 			jsonArrayBuilder.add(downloadId);
 			part += 1;
@@ -1037,13 +1049,12 @@ public class UserResource {
 	/**
 	 * Format the filename for a queued Download, possibly one part of many.
 	 * 
-	 * @param facilityName ICAT Facility.name
-	 * @param visitId      ICAT Investigation.visitId
-	 * @param part         1 indexed part of the overall request
-	 * @param size         Number of parts in the overall request
+	 * @param filename Root of the formatted filename, either user specified or defaulted.
+	 * @param part     1 indexed part of the overall request
+	 * @param size     Number of parts in the overall request
 	 * @return Formatted filename
 	 */
-	private static String formatQueuedFilename(String facilityName, String visitId, int part, int size) {
+	private static String formatQueuedFilename(String filename, int part, int size) {
 		String partString = String.valueOf(part);
 		String sizeString = String.valueOf(size);
 		StringBuilder partBuilder = new StringBuilder();
@@ -1053,9 +1064,7 @@ public class UserResource {
 		partBuilder.append(partString);
 
 		StringBuilder filenameBuilder = new StringBuilder();
-		filenameBuilder.append(facilityName);
-		filenameBuilder.append("_");
-		filenameBuilder.append(visitId);
+		filenameBuilder.append(filename);
 		filenameBuilder.append("_part_");
 		filenameBuilder.append(partBuilder);
 		filenameBuilder.append("_of_");
