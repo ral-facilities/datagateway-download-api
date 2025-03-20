@@ -868,6 +868,8 @@ public class UserResource {
 	 * @param facilityName ICAT Facility.name
 	 * @param sessionId    ICAT sessionId
 	 * @param transport    Transport mechanism to use
+	 * @param fileName     Optional name to use as the root for each individual part
+	 *                     Download. Defaults to facilityName_visitId.
 	 * @param email        Optional email to notify upon completion
 	 * @param visitId      ICAT Investigation.visitId to submit
 	 * @return Array of Download ids
@@ -880,7 +882,7 @@ public class UserResource {
 			@FormParam("fileName") String fileName, @FormParam("email") String email,
 			@FormParam("visitId") String visitId) throws TopcatException {
 
-		logger.info("queueVisitId called");
+		logger.info("queueVisitId called for {}", visitId);
 		validateTransport(transport);
 
 		String icatUrl = getIcatUrl(facilityName);
@@ -949,6 +951,8 @@ public class UserResource {
 	 * @param facilityName ICAT Facility.name
 	 * @param sessionId    ICAT sessionId
 	 * @param transport    Transport mechanism to use
+	 * @param fileName     Optional name to use as the root for each individual part
+	 *                     Download. Defaults to facilityName_visitId.
 	 * @param email        Optional email to notify upon completion
 	 * @param files        ICAT Datafile.locations to download
 	 * @return Array of Download ids
@@ -962,11 +966,11 @@ public class UserResource {
 			@FormParam("fileName") String fileName, @FormParam("email") String email,
 			@FormParam("files") List<String> files) throws TopcatException, UnsupportedEncodingException {
 
-		logger.info("queueFiles called");
-		validateTransport(transport);
-		if (files.size() == 0) {
+		if (files == null || files.size() == 0) {
 			throw new BadRequestException("At least one Datafile.location required");
 		}
+		logger.info("queueFiles called for {} files", files.size());
+		validateTransport(transport);
 
 		String icatUrl = getIcatUrl(facilityName);
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
