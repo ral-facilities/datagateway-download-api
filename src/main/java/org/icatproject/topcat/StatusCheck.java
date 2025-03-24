@@ -323,16 +323,19 @@ public class StatusCheck {
     String restoringCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.RESTORING";
     String pausedCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.PAUSED";
 
+    int availableDownloads = maxActiveDownloads;
     if (maxActiveDownloads > 0) {
+      // Work out how many "available" spaces there are by accounting for the active Downloads
       String activeQueryString = selectString + " and " + restoringCondition;
       TypedQuery<Download> activeDownloadsQuery = em.createQuery(activeQueryString, Download.class);
       List<Download> activeDownloads = activeDownloadsQuery.getResultList();
-      maxActiveDownloads -= activeDownloads.size();
-      if (maxActiveDownloads <= 0) {
+      int activeDownloadsSize = activeDownloads.size();
+      if (activeDownloadsSize >= maxActiveDownloads) {
         String format = "More downloads currently RESTORING {} than maxActiveDownloads {}, cannot prepare queued jobs";
-        logger.info(format, activeDownloads.size(), maxActiveDownloads);
+        logger.info(format, activeDownloadsSize, maxActiveDownloads);
         return;
       }
+      availableDownloads -= activeDownloadsSize;
     }
 
     String queuedQueryString = selectString + " and " + pausedCondition + " and download.preparedId = null";
@@ -342,14 +345,14 @@ public class StatusCheck {
 
     Map<String, String> sessionIds = new HashMap<>();
     if (maxActiveDownloads <= 0) {
-      logger.info("Preparing {} queued downloads", queuedDownloads.size());
       // No limits on how many to submit
+      logger.info("Preparing {} queued downloads", queuedDownloads.size());
       for (Download queuedDownload : queuedDownloads) {
         queuedDownload.setStatus(DownloadStatus.PREPARING);
         prepareDownload(queuedDownload, null, getQueueSessionId(sessionIds, queuedDownload.getFacilityName()));
       }
     } else {
-      logger.info("Preparing up to {} queued downloads", maxActiveDownloads);
+      logger.info("Preparing up to {} queued downloads", availableDownloads);
       HashMap<Integer, List<Download>> mapping = new HashMap<>();
       for (Download queuedDownload : queuedDownloads) {
         String sessionId = getQueueSessionId(sessionIds, queuedDownload.getFacilityName());
@@ -360,8 +363,8 @@ public class StatusCheck {
           // Highest priority, prepare now
           queuedDownload.setStatus(DownloadStatus.PREPARING);
           prepareDownload(queuedDownload, null, sessionId);
-          maxActiveDownloads -= 1;
-          if (maxActiveDownloads <= 0) {
+          availableDownloads -= 1;
+          if (availableDownloads <= 0) {
             return;
           }
         } else {
@@ -381,8 +384,8 @@ public class StatusCheck {
         for (Download download : downloadList) {
           download.setStatus(DownloadStatus.PREPARING);
           prepareDownload(download, null, getQueueSessionId(sessionIds, download.getFacilityName()));
-          maxActiveDownloads -= 1;
-          if (maxActiveDownloads <= 0) {
+          availableDownloads -= 1;
+          if (availableDownloads <= 0) {
             return;
           }
         }
