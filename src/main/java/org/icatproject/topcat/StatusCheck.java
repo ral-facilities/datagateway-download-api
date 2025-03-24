@@ -236,6 +236,10 @@ public class StatusCheck {
   }
 
   private void prepareDownload(Download download, IdsClient injectedIdsClient) throws Exception {
+    prepareDownload(download, injectedIdsClient, download.getSessionId());
+  }
+
+  private void prepareDownload(Download download, IdsClient injectedIdsClient, String sessionId) throws Exception {
 
     try {
       IdsClient idsClient = injectedIdsClient;
@@ -243,11 +247,11 @@ public class StatusCheck {
     	  idsClient = new IdsClient(getDownloadUrl(download.getFacilityName(),download.getTransport()));
       }
       logger.info("Requesting prepareData for Download " + download.getFileName());
-      String preparedId = idsClient.prepareData(download.getSessionId(), download.getInvestigationIds(), download.getDatasetIds(), download.getDatafileIds());
+      String preparedId = idsClient.prepareData(sessionId, download.getInvestigationIds(), download.getDatasetIds(), download.getDatafileIds());
       download.setPreparedId(preparedId);
 
       try {
-        Long size = idsClient.getSize(download.getSessionId(), download.getInvestigationIds(), download.getDatasetIds(), download.getDatafileIds());
+        Long size = idsClient.getSize(sessionId, download.getInvestigationIds(), download.getDatasetIds(), download.getDatafileIds());
         download.setSize(size);
       } catch(Exception e) {
     	logger.error("prepareDownload: setting size to -1 as getSize threw exception: " + e.getMessage());
@@ -274,7 +278,31 @@ public class StatusCheck {
     }
 
   }
-  
+
+  /**
+   * Gets a functional sessionId to use for submitting to the queue, logging in if needed.
+   * 
+   * @param sessionIds   Map from Facility to functional sessionId
+   * @param facilityName Name of ICAT Facility to get the sessionId for
+   * @return Functional ICAT sessionId
+   * @throws InternalException If the facilityName cannot be mapped to an ICAT url
+   * @throws BadRequestException If the login fails
+   */
+  private String getQueueSessionId(Map<String, String> sessionIds, String facilityName)
+      throws InternalException, BadRequestException {
+    String sessionId = sessionIds.get(facilityName);
+    if (sessionId == null) {
+      IcatClient icatClient = new IcatClient(FacilityMap.getInstance().getIcatUrl(facilityName));
+      Properties properties = Properties.getInstance();
+      String plugin = properties.getProperty("queue.account." + facilityName + ".plugin");
+      String username = properties.getProperty("queue.account." + facilityName + ".username");
+      String password = properties.getProperty("queue.account." + facilityName + ".password");
+      sessionId = icatClient.login(plugin, username, password);
+      sessionIds.put(facilityName, sessionId);
+    }
+    return sessionId;
+  }
+
   /**
    * Prepares Downloads which are queued (PAUSED with no preparedId) up to the
    * maxActiveDownloads limit.
@@ -312,24 +340,26 @@ public class StatusCheck {
     TypedQuery<Download> queuedDownloadsQuery = em.createQuery(queuedQueryString, Download.class);
     List<Download> queuedDownloads = queuedDownloadsQuery.getResultList();
 
+    Map<String, String> sessionIds = new HashMap<>();
     if (maxActiveDownloads <= 0) {
       logger.info("Preparing {} queued downloads", queuedDownloads.size());
       // No limits on how many to submit
       for (Download queuedDownload : queuedDownloads) {
         queuedDownload.setStatus(DownloadStatus.PREPARING);
-        prepareDownload(queuedDownload, null);
+        prepareDownload(queuedDownload, null, getQueueSessionId(sessionIds, queuedDownload.getFacilityName()));
       }
     } else {
       logger.info("Preparing up to {} queued downloads", maxActiveDownloads);
       HashMap<Integer, List<Download>> mapping = new HashMap<>();
       for (Download queuedDownload : queuedDownloads) {
+        String sessionId = getQueueSessionId(sessionIds, queuedDownload.getFacilityName());
         String icatUrl = FacilityMap.getInstance().getIcatUrl(queuedDownload.getFacilityName());
-        IcatClient icatClient = new IcatClient(icatUrl, queuedDownload.getSessionId());
+        IcatClient icatClient = new IcatClient(icatUrl, sessionId);
         int priority = icatClient.getQueuePriority(queuedDownload.getUserName());
         if (priority == 1) {
           // Highest priority, prepare now
           queuedDownload.setStatus(DownloadStatus.PREPARING);
-          prepareDownload(queuedDownload, null);
+          prepareDownload(queuedDownload, null, sessionId);
           maxActiveDownloads -= 1;
           if (maxActiveDownloads <= 0) {
             return;
@@ -350,7 +380,7 @@ public class StatusCheck {
         List<Download> downloadList = mapping.get(key);
         for (Download download : downloadList) {
           download.setStatus(DownloadStatus.PREPARING);
-          prepareDownload(download, null);
+          prepareDownload(download, null, getQueueSessionId(sessionIds, download.getFacilityName()));
           maxActiveDownloads -= 1;
           if (maxActiveDownloads <= 0) {
             return;
