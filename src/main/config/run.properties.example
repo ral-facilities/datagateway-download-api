@@ -93,6 +93,13 @@ defaultPlugin=simple
 # Facility to use if it is not specified in the login request
 defaultFacilityName=LILS
 
+# Queued Downloads are authorized with the user's sessionId, but this may expire before
+# the Download is ready to be prepared so these will be submitted to the IDS with a
+# functional read all account.
+queue.account.LILS.plugin=simple
+queue.account.LILS.username=username
+queue.account.LILS.password=password
+
 # Limit the number maximum of active RESTORING downloads. Does not affect user submitted carts,
 # but queued requests will only be started when there are less than this many RESTORING downloads.
 # Negative values will start all queued jobs immediately, regardless of load.

@@ -240,7 +240,13 @@ public class UserResourceTest {
 		if (newDownload.getStatus().equals(DownloadStatus.valueOf(downloadStatus))) {
 			downloadStatus = "PAUSED";
 		}
-
+		// We cannot modify the status of a download without a prepared id
+		// Using downloadRepository will create a new Download with a different id,
+		// so remove the old one without the preparedId.
+		newDownload.setPreparedId("preparedId");
+		Download preparedDownload = downloadRepository.save(newDownload);
+		downloadRepository.removeDownload(downloadId);
+		downloadId = preparedDownload.getId();
 		response = userResource.setDownloadStatus(downloadId, facilityName, sessionId, downloadStatus);
 		assertEquals(200, response.getStatus());
 
@@ -368,6 +374,7 @@ public class UserResourceTest {
 		assertEquals(true, response.getEntity());
 	}
 
+	@Test
 	public void testSetDownloadStatus() throws Exception {
 		Long downloadId = null;
 		try {
@@ -383,9 +390,10 @@ public class UserResourceTest {
 			downloadRepository.save(testDownload);
 			downloadId = testDownload.getId();
 	
-			assertThrows("Cannot modify status of a queued download", ForbiddenException.class, () -> {
+			ForbiddenException exception = assertThrows(ForbiddenException.class, () -> {
 				userResource.setDownloadStatus(testDownload.getId(), facilityName, sessionId, DownloadStatus.RESTORING.toString());
 			});
+			assertEquals("(403) : Cannot modify status of a download before it's prepared", exception.getMessage());
 	
 			Response response = userResource.getDownloads(facilityName, sessionId, null);
 			assertEquals(200, response.getStatus());

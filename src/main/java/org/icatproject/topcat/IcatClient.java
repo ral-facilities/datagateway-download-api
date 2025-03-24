@@ -38,14 +38,26 @@ public class IcatClient {
 	/**
 	 * Login to create a session
 	 * 
-	 * @param jsonString with plugin and credentials which takes the form
-	 *                   <code>{"plugin":"db", "credentials:[{"username":"root"}, {"password":"guess"}]}</code>
+	 * @param plugin   ICAT authentication plugin
+	 * @param username ICAT username
+	 * @param password ICAT password
 	 * @return json with sessionId of the form
 	 *         <samp>{"sessionId","0d9a3706-80d4-4d29-9ff3-4d65d4308a24"}</samp>
 	 * @throws BadRequestException
 	 */
-	public String login(String jsonString) throws BadRequestException {
+	public String login(String plugin, String username, String password) throws BadRequestException {
 		try {
+			JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
+			JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+			JsonObjectBuilder usernameBuilder = Json.createObjectBuilder();
+			JsonObjectBuilder passwordBuilder = Json.createObjectBuilder();
+			usernameBuilder.add("username", username);
+			passwordBuilder.add("password", password);
+			arrayBuilder.add(usernameBuilder);
+			arrayBuilder.add(passwordBuilder);
+			objectBuilder.add("plugin", plugin);
+			objectBuilder.add("credentials", arrayBuilder);
+			String jsonString = "json=" + objectBuilder.build().toString();
 			Response response = httpClient.post("session", new HashMap<String, String>(), jsonString);
 			return response.toString();
 		} catch (Exception e) {
@@ -379,7 +391,8 @@ public class IcatClient {
 			}
 		}
 
-		if (!userName.equals(Properties.getInstance().getProperty("anonUserName"))) {
+		if (!userName.startsWith(Properties.getInstance().getProperty("anonUserName"))) {
+			// The anonymous cart username will end with the user's sessionId so cannot do .equals
 			return priorityMap.getAuthenticatedPriority();
 		} else {
 			return priorityMap.getDefaultPriority();

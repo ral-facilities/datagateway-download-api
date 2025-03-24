@@ -108,19 +108,7 @@ public class UserResource {
 		}
 		String icatUrl = getIcatUrl(facilityName);
 		IcatClient icatClient = new IcatClient(icatUrl);
-
-		JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-		JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
-		JsonObjectBuilder usernameBuilder = Json.createObjectBuilder();
-		JsonObjectBuilder passwordBuilder = Json.createObjectBuilder();
-		usernameBuilder.add("username", username);
-		passwordBuilder.add("password", password);
-		arrayBuilder.add(usernameBuilder);
-		arrayBuilder.add(passwordBuilder);
-		objectBuilder.add("plugin", plugin);
-		objectBuilder.add("credentials", arrayBuilder);
-
-		return icatClient.login("json=" + objectBuilder.build().toString());
+		return icatClient.login(plugin, username, password);
 	}
 
 	/**
@@ -330,8 +318,8 @@ public class UserResource {
 		if (!download.getUserName().equals(cartUserName)) {
 			throw new ForbiddenException("you do not have permission to delete this download");
 		}
-        if (download.getPreparedId() == null && download.getStatus().equals(DownloadStatus.PAUSED)) {
-            throw new ForbiddenException("Cannot modify status of a queued download");
+        if (download.getPreparedId() == null) {
+            throw new ForbiddenException("Cannot modify status of a download before it's prepared");
         }
 
         download.setStatus(DownloadStatus.valueOf(value));
