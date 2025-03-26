@@ -42,6 +42,7 @@ import org.icatproject.topcat.PriorityMap;
 import org.icatproject.topcat.FacilityMap;
 import org.icatproject.topcat.IcatClient;
 import org.icatproject.topcat.Properties;
+import org.icatproject.topcat.IcatClient.DatafilesResponse;
 
 @Stateless
 @LocalBean
@@ -65,7 +66,8 @@ public class UserResource {
 
 	private String anonUserName;
 	private String defaultPlugin;
-	private long queueMaxFileCount;
+	private long queueVisitMaxPartFileCount;
+	private long queueFilesMaxFileCount;
 
 	@PersistenceContext(unitName = "topcat")
 	EntityManager em;
@@ -74,7 +76,8 @@ public class UserResource {
 		Properties properties = Properties.getInstance();
 		this.anonUserName = properties.getProperty("anonUserName", "");
 		this.defaultPlugin = properties.getProperty("defaultPlugin", "simple");
-		this.queueMaxFileCount = Long.valueOf(properties.getProperty("queue.maxFileCount", "10000"));
+		this.queueVisitMaxPartFileCount = Long.valueOf(properties.getProperty("queue.visit.maxPartFileCount", "10000"));
+		this.queueFilesMaxFileCount = Long.valueOf(properties.getProperty("queue.files.maxFileCount", "10000"));
     }
 
 	/**
@@ -870,6 +873,9 @@ public class UserResource {
 			@FormParam("fileName") String fileName, @FormParam("email") String email,
 			@FormParam("visitId") String visitId) throws TopcatException {
 
+		if (visitId == null || visitId.equals("")) {
+			throw new BadRequestException("visitId must be provided");
+		}
 		logger.info("queueVisitId called for {}", visitId);
 		validateTransport(transport);
 
@@ -883,11 +889,15 @@ public class UserResource {
 		String fullName = icatClient.getFullName();
 		icatClient.checkQueueAllowed(userName);
 		JsonArray datasets = icatClient.getDatasets(visitId);
+		if (datasets.size() == 0) {
+			throw new NotFoundException("No Datasets found for " + visitId);
+		}
 
 		long downloadId;
 		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
 
 		long downloadFileCount = 0L;
+		long downloadFileSize = 0L;
 		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
 		List<Download> downloads = new ArrayList<Download>();
 		Download newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
@@ -896,16 +906,22 @@ public class UserResource {
 			JsonArray datasetArray = dataset.asJsonArray();
 			long datasetId = datasetArray.getJsonNumber(0).longValueExact();
 			long datasetFileCount = datasetArray.getJsonNumber(1).longValueExact();
+			long datasetFileSize = datasetArray.getJsonNumber(2).longValueExact();
+			// Database triggers should set these, but check explicitly anyway
 			if (datasetFileCount < 1L) {
-				// Database triggers should set this, but check explicitly anyway
 				datasetFileCount = icatClient.getDatasetFileCount(datasetId);
 			}
+			if (datasetFileSize < 1L) {
+				datasetFileSize = icatClient.getDatasetFileSize(datasetId);
+			}
 
-			if (downloadFileCount > 0L && downloadFileCount + datasetFileCount > queueMaxFileCount) {
+			if (downloadFileCount > 0L && downloadFileCount + datasetFileCount > queueVisitMaxPartFileCount) {
 				newDownload.setDownloadItems(downloadItems);
+				newDownload.setSize(downloadFileSize);
 				downloads.add(newDownload);
 
 				downloadFileCount = 0L;
+				downloadFileSize = 0L;
 				downloadItems = new ArrayList<DownloadItem>();
 				newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
 			}
@@ -913,8 +929,10 @@ public class UserResource {
 			DownloadItem downloadItem = createDownloadItem(newDownload, datasetId, EntityType.dataset);
 			downloadItems.add(downloadItem);
 			downloadFileCount += datasetFileCount;
+			downloadFileSize += datasetFileSize;
 		}
 		newDownload.setDownloadItems(downloadItems);
+		newDownload.setSize(downloadFileSize);
 		downloads.add(newDownload);
 
 		int part = 1;
@@ -956,8 +974,7 @@ public class UserResource {
 	}
 
 	/**
-	 * Queue download of Datafiles by location, splitting into part Downloads if
-	 * needed.
+	 * Queue download of Datafiles by location, up to a configurable limit.
 	 * 
 	 * @param facilityName ICAT Facility.name
 	 * @param sessionId    ICAT sessionId
@@ -979,59 +996,48 @@ public class UserResource {
 
 		if (files == null || files.size() == 0) {
 			throw new BadRequestException("At least one Datafile.location required");
+		} else if (files.size() > queueFilesMaxFileCount) {
+			throw new BadRequestException("Limit of " + queueFilesMaxFileCount + " files exceeded");
 		}
 		logger.info("queueFiles called for {} files", files.size());
 		validateTransport(transport);
+		if (fileName == null) {
+			fileName = facilityName + "_files";
+		}
 
 		String icatUrl = getIcatUrl(facilityName);
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 		String transportUrl = getDownloadUrl(facilityName, transport);
 		IdsClient idsClient = new IdsClient(transportUrl);
 
-		// If we wanted to block the user, this is where we would do it
 		String userName = icatClient.getUserName();
 		String fullName = icatClient.getFullName();
 		icatClient.checkQueueAllowed(userName);
-		List<Long> datafileIds = icatClient.getDatafiles(files);
 
-		long downloadId;
-		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
+		DatafilesResponse response = icatClient.getDatafiles(files);
+		if (response.ids.size() == 0) {
+			throw new NotFoundException("No Datafiles found");
+		}
 
-		long downloadFileCount = 0L;
-		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
-		List<Download> downloads = new ArrayList<Download>();
-		Download newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
-
-		for (long datafileId : datafileIds) {
-			if (downloadFileCount >= queueMaxFileCount) {
-				newDownload.setDownloadItems(downloadItems);
-				downloads.add(newDownload);
-
-				downloadFileCount = 0L;
-				downloadItems = new ArrayList<DownloadItem>();
-				newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
-			}
-
-			DownloadItem downloadItem = createDownloadItem(newDownload, datafileId, EntityType.datafile);
+		List<DownloadItem> downloadItems = new ArrayList<>();
+		Download download = createDownload(sessionId, facilityName, fileName, userName, fullName, transport, email);
+		for (long datafileId : response.ids) {
+			DownloadItem downloadItem = createDownloadItem(download, datafileId, EntityType.datafile);
 			downloadItems.add(downloadItem);
-			downloadFileCount += 1L;
 		}
-		newDownload.setDownloadItems(downloadItems);
-		downloads.add(newDownload);
+		download.setDownloadItems(downloadItems);
+		download.setSize(response.totalSize);
 
-		int part = 1;
-		if (fileName == null) {
-			fileName = facilityName + "_files";
-		}
-		for (Download download : downloads) {
-			String partFilename = formatQueuedFilename(fileName, part, downloads.size());
-			download.setFileName(partFilename);
-			downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
-			jsonArrayBuilder.add(downloadId);
-			part += 1;
-		}
+		long downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
 
-		return Response.ok(jsonArrayBuilder.build()).build();
+		JsonObjectBuilder jsonObjectBuilder = Json.createObjectBuilder();
+		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
+		for (String missingFile : response.missing) {
+			jsonArrayBuilder.add(missingFile);
+		}
+		jsonObjectBuilder.add("downloadId", downloadId);
+		jsonObjectBuilder.add("notFound", jsonArrayBuilder);
+		return Response.ok(jsonObjectBuilder.build()).build();
 	}
 
 	/**
