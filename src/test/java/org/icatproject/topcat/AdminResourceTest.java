@@ -1,6 +1,7 @@
 package org.icatproject.topcat;
 
 import java.util.*;
+import java.util.Date;
 import java.io.File;
 import java.lang.reflect.*;
 
@@ -306,6 +307,42 @@ public class AdminResourceTest {
 			// by default, make sure that's what we set it to now!
 			response = adminResource.setDownloadTypeStatus(downloadType, facilityName, adminSessionId, false, message);
 			assertEquals(200, response.getStatus());
+		}
+	}
+
+	@Test
+	public void testPrepareDownload() throws Exception {
+		Long downloadId = null;
+		try {
+			Download testDownload = new Download();
+			String facilityName = "LILS";
+			testDownload.setFacilityName(facilityName);
+			testDownload.setSessionId(adminSessionId);
+			testDownload.setStatus(DownloadStatus.EXPIRED);
+			testDownload.setIsDeleted(true);
+			testDownload.setIsTwoLevel(true);
+			testDownload.setDeletedAt(new Date());
+			testDownload.setUserName("simple/root");
+			testDownload.setFileName("testFile.txt");
+			testDownload.setTransport("http");
+			downloadRepository.save(testDownload);
+			downloadId = testDownload.getId();
+
+			Response response = adminResource.prepareDownload(downloadId, facilityName, adminSessionId);
+			assertEquals(200, response.getStatus());
+
+			response = adminResource.getDownloads(facilityName, adminSessionId, null);
+			assertEquals(200, response.getStatus());
+			List<Download> downloads = (List<Download>) response.getEntity();
+
+			testDownload = findDownload(downloads, downloadId);
+			assertEquals(DownloadStatus.RESTORING, testDownload.getStatus());
+			assertFalse(testDownload.getIsDeleted());
+			assertNull(testDownload.getDeletedAt());
+		} finally {
+			if (downloadId != null) {
+				downloadRepository.removeDownload(downloadId);
+			}
 		}
 	}
 

@@ -218,35 +218,61 @@ public class StatusCheck {
     }
   }
 
-  private void prepareDownload(Download download, IdsClient injectedIdsClient) throws Exception {
+  /**
+   * Public static method for external calls to prepare a Download.
+   * 
+   * @param downloadRepository DownloadRepository to save the updated Download
+   * @param download           Download to prepare
+   * @param sessionId          ICAT sessionId to use, possibly different from
+   *                           the one set on the Download if it has expired
+   * @param injectedIdsClient  Optional (possibly mock) IdsClient
+   * @throws TopcatException If prepareData fails
+   */
+  public static void prepareDownload(DownloadRepository downloadRepository, Download download, String sessionId,
+      IdsClient injectedIdsClient) throws TopcatException {
+
+    IdsClient idsClient = injectedIdsClient;
+    if( idsClient == null ) {
+      idsClient = new IdsClient(getDownloadUrl(download.getFacilityName(),download.getTransport()));
+    }
+    logger.info("Requesting prepareData for Download " + download.getFileName());
+    String preparedId = idsClient.prepareData(sessionId, download.getInvestigationIds(), download.getDatasetIds(),
+        download.getDatafileIds());
+    download.setPreparedId(preparedId);
 
     try {
-      IdsClient idsClient = injectedIdsClient;
-      if( idsClient == null ) {
-    	  idsClient = new IdsClient(getDownloadUrl(download.getFacilityName(),download.getTransport()));
-      }
-      logger.info("Requesting prepareData for Download " + download.getFileName());
-      String preparedId = idsClient.prepareData(download.getSessionId(), download.getInvestigationIds(), download.getDatasetIds(), download.getDatafileIds());
-      download.setPreparedId(preparedId);
+      Long size = idsClient.getSize(sessionId, download.getInvestigationIds(), download.getDatasetIds(),
+          download.getDatafileIds());
+      download.setSize(size);
+    } catch(Exception e) {
+      logger.error("prepareDownload: setting size to -1 as getSize threw exception: " + e.getMessage());
+      download.setSize(-1);
+    }
 
-      try {
-        Long size = idsClient.getSize(download.getSessionId(), download.getInvestigationIds(), download.getDatasetIds(), download.getDatafileIds());
-        download.setSize(size);
-      } catch(Exception e) {
-    	logger.error("prepareDownload: setting size to -1 as getSize threw exception: " + e.getMessage());
-        download.setSize(-1);
-      }
+    if (download.getIsTwoLevel() || !download.getTransport().matches("https|http")) {
+      logger.info("Setting Download status RESTORING for " + download.getFileName());
+      download.setStatus(DownloadStatus.RESTORING);
+    } else {
+      logger.info("Setting Download status COMPLETE for " + download.getFileName());
+      download.setStatus(DownloadStatus.COMPLETE);
+      download.setCompletedAt(new Date());
+    }
 
-      if (download.getIsTwoLevel() || !download.getTransport().matches("https|http")) {
-    	  logger.info("Setting Download status RESTORING for " + download.getFileName());
-        download.setStatus(DownloadStatus.RESTORING);
-      } else {
-    	  logger.info("Setting Download status COMPLETE for " + download.getFileName());
-        download.setStatus(DownloadStatus.COMPLETE);
-        download.setCompletedAt(new Date());
-      }
+    downloadRepository.save(download);
+  }
 
-      downloadRepository.save(download);
+  /**
+   * Private method for internal calls to prepare a Download. Exceptions will
+   * be handled if possible, and the Download might be marked as EXPIRED as
+   * part of this process.
+   * 
+   * @param download           Download to prepare
+   * @param injectedIdsClient  Optional (possibly mock) IdsClient
+   * @throws Exception If internal exceptions could not be handled
+   */
+  private void prepareDownload(Download download, IdsClient injectedIdsClient) throws Exception {
+    try {
+      prepareDownload(downloadRepository, download, download.getSessionId(), injectedIdsClient);
     } catch(NotFoundException e){
     	handleException(download, "prepareDownload NotFoundException: " + e.getMessage());
     } catch(TopcatException e) {
@@ -255,7 +281,6 @@ public class StatusCheck {
     } catch(Exception e){
     	handleException(download, "prepareDownload Exception: " + e.toString());
     }
-
   }
   
   private void handleException( Download download, String reason, boolean doExpire ) {
@@ -277,7 +302,7 @@ public class StatusCheck {
 	  handleException( download, reason, false );
   }
 
-  private String getDownloadUrl( String facilityName, String downloadType ) throws InternalException{
+  private static String getDownloadUrl( String facilityName, String downloadType ) throws InternalException{
       return FacilityMap.getInstance().getDownloadUrl(facilityName, downloadType);
   }
 }
