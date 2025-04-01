@@ -983,7 +983,8 @@ public class UserResource {
 	 *                     Download. Defaults to facilityName_visitId.
 	 * @param email        Optional email to notify upon completion
 	 * @param files        ICAT Datafile.locations to download
-	 * @return Array of Download ids
+	 * @return The resultant downloadId and an array of any locations which could not
+	 * 		   be found
 	 * @throws TopcatException
 	 * @throws UnsupportedEncodingException 
 	 */

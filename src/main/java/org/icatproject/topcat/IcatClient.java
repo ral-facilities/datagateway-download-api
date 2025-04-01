@@ -27,6 +27,24 @@ public class IcatClient {
 		public final List<Long> ids = new ArrayList<>();
 		public final Set<String> missing = new HashSet<>();
 		public long totalSize = 0L;
+
+		/**
+		 * Submit a query for Datafiles, then appends the ids, increments the size, and
+		 * records any missing file locations.
+		 * 
+		 * @param query Query to submit
+		 * @throws TopcatException If the query returns not authorized, or not found.
+		 */
+		public void submitDatafilesQuery(String query)
+				throws TopcatException {
+			JsonArray jsonArray = submitQuery(query);
+			for (JsonObject jsonObject : jsonArray.getValuesAs(JsonObject.class)) {
+				JsonObject datafile = jsonObject.getJsonObject("Datafile");
+				ids.add(datafile.getJsonNumber("id").longValueExact());
+				missing.remove(datafile.getString("location"));
+				totalSize += datafile.getJsonNumber("fileSize").longValueExact();
+			}
+		}
 	}
 
 	private Logger logger = LoggerFactory.getLogger(IcatClient.class);
@@ -185,13 +203,7 @@ public class IcatClient {
 			String quotedFile = "'" + file + "'";
 			int encodedFileLength = URLEncoder.encode(quotedFile, "UTF8").length();
 			if (chunkSize + 3 + encodedFileLength > chunkLimit) {
-				JsonArray jsonArray = submitQuery(queryPrefix + chunkedFiles + querySuffix);
-				for (JsonObject jsonObject : jsonArray.getValuesAs(JsonObject.class)) {
-					JsonObject datafile = jsonObject.getJsonObject("Datafile");
-					response.ids.add(datafile.getJsonNumber("id").longValueExact());
-					response.missing.remove(datafile.getString("location"));
-					response.totalSize += datafile.getJsonNumber("fileSize").longValueExact();
-				}
+				response.submitDatafilesQuery(queryPrefix + chunkedFiles + querySuffix);
 
 				chunkedFiles = quotedFile;
 				chunkSize = encodedFileLength;
@@ -202,13 +214,7 @@ public class IcatClient {
 				response.missing.add(file);
 			}
 		}
-		JsonArray jsonArray = submitQuery(queryPrefix + chunkedFiles + querySuffix);
-		for (JsonObject jsonObject : jsonArray.getValuesAs(JsonObject.class)) {
-			JsonObject datafile = jsonObject.getJsonObject("Datafile");
-			response.ids.add(datafile.getJsonNumber("id").longValueExact());
-			response.missing.remove(datafile.getString("location"));
-			response.totalSize += datafile.getJsonNumber("fileSize").longValueExact();
-		}
+		response.submitDatafilesQuery(queryPrefix + chunkedFiles + querySuffix);
 	
 		return response;
 	}
@@ -238,13 +244,9 @@ public class IcatClient {
 	 * @throws TopcatException
 	 */
 	public long getDatasetFileSize(long datasetId) throws TopcatException {
-			String query = "SELECT datafile.fileSize FROM Datafile datafile WHERE datafile.dataset.id = " + datasetId;
+			String query = "SELECT SUM(datafile.fileSize) FROM Datafile datafile WHERE datafile.dataset.id = " + datasetId;
 		JsonArray jsonArray = submitQuery(query);
-		long size = 0L;
-		for (JsonNumber number : jsonArray.getValuesAs(JsonNumber.class)) {
-			size += number.longValueExact();
-		}
-		return size;
+		return jsonArray.getJsonNumber(0).longValueExact();
 	}
 
 	/**
@@ -275,6 +277,11 @@ public class IcatClient {
 
 	/**
 	 * Gets a single Entity of the specified type, without any other conditions.
+	 * 
+	 * NOTE: This function is written and intended for getting Investigation,
+	 * Dataset or Datafile entities as part of the tests. It does not handle casing of
+	 * entities containing multiple words, or querying for a specific instance of an
+	 * entity.
 	 * 
 	 * @param entityType Type of ICAT Entity to get
 	 * @return A single ICAT Entity of the specified type as a JsonObject
@@ -429,7 +436,8 @@ public class IcatClient {
 			}
 		}
 
-		if (!userName.startsWith(Properties.getInstance().getProperty("anonUserName"))) {
+		String anonUserName = Properties.getInstance().getProperty("anonUserName");
+		if (anonUserName == null || !userName.startsWith(anonUserName)) {
 			// The anonymous cart username will end with the user's sessionId so cannot do .equals
 			return priorityMap.getAuthenticatedPriority();
 		} else {
