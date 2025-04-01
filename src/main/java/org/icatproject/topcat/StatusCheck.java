@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import jakarta.ejb.EJB;
 import jakarta.ejb.Schedule;
 import jakarta.ejb.Singleton;
+import jakarta.json.JsonObject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
@@ -114,35 +115,35 @@ public class StatusCheck {
     String queryString = selectString + " and " + notExpiredCondition + " and (" + isActiveCondition + ")";
 
     TypedQuery<Download> query = em.createQuery(queryString, Download.class);
-      List<Download> downloads = query.getResultList();
+    List<Download> downloads = query.getResultList();
 
     for (Download download : downloads) {
-        Date lastCheck = lastChecks.get(download.getId());
-        Date now = new Date();
-        long createdSecondsAgo = (now.getTime() - download.getCreatedAt().getTime()) / 1000;
+      Date lastCheck = lastChecks.get(download.getId());
+      Date now = new Date();
+      long createdSecondsAgo = (now.getTime() - download.getCreatedAt().getTime()) / 1000;
       if (download.getStatus() == DownloadStatus.PREPARING) {
         // If prepareDownload was called previously but caught an exception (other than
         // TopcatException), we should not call it again immediately, but should impose
         // a delay. See issue #462.
         if (lastCheck == null) {
-        	  prepareDownload(download, injectedIdsClient);
-            } else {
-              long lastCheckSecondsAgo = (now.getTime() - lastCheck.getTime()) / 1000;
+      	  prepareDownload(download, injectedIdsClient);
+        } else {
+          long lastCheckSecondsAgo = (now.getTime() - lastCheck.getTime()) / 1000;
           if (lastCheckSecondsAgo >= pollIntervalWait) {
-            	  prepareDownload(download, injectedIdsClient);
-              }
-            }
-      } else if (createdSecondsAgo >= pollDelay) {
-        if (lastCheck == null) {
-            performCheck(download, injectedIdsClient);
-          } else {
-            long lastCheckSecondsAgo = (now.getTime() - lastCheck.getTime()) / 1000;
-          if (lastCheckSecondsAgo >= pollIntervalWait) {
-              performCheck(download, injectedIdsClient);
-            }
+         	  prepareDownload(download, injectedIdsClient);
           }
         }
-      }	  
+      } else if (download.getPreparedId() != null && createdSecondsAgo >= pollDelay) {
+        if (lastCheck == null) {
+          performCheck(download, injectedIdsClient);
+        } else {
+          long lastCheckSecondsAgo = (now.getTime() - lastCheck.getTime()) / 1000;
+          if (lastCheckSecondsAgo >= pollIntervalWait) {
+            performCheck(download, injectedIdsClient);
+          }
+        }
+      }
+    }	  
   }
 
   private void performCheck(Download download, IdsClient injectedIdsClient) {
@@ -250,12 +251,14 @@ public class StatusCheck {
       String preparedId = idsClient.prepareData(sessionId, download.getInvestigationIds(), download.getDatasetIds(), download.getDatafileIds());
       download.setPreparedId(preparedId);
 
-      try {
-        Long size = idsClient.getSize(sessionId, download.getInvestigationIds(), download.getDatasetIds(), download.getDatafileIds());
-        download.setSize(size);
-      } catch(Exception e) {
-    	logger.error("prepareDownload: setting size to -1 as getSize threw exception: " + e.getMessage());
-        download.setSize(-1);
+      if (download.getSize() <= 0) {
+        try {
+          Long size = idsClient.getSize(sessionId, download.getInvestigationIds(), download.getDatasetIds(), download.getDatafileIds());
+          download.setSize(size);
+        } catch(Exception e) {
+          logger.error("prepareDownload: setting size to -1 as getSize threw exception: " + e.getMessage());
+          download.setSize(-1);
+        }
       }
 
       if (download.getIsTwoLevel() || !download.getTransport().matches("https|http")) {
@@ -285,11 +288,10 @@ public class StatusCheck {
    * @param sessionIds   Map from Facility to functional sessionId
    * @param facilityName Name of ICAT Facility to get the sessionId for
    * @return Functional ICAT sessionId
-   * @throws InternalException If the facilityName cannot be mapped to an ICAT url
-   * @throws BadRequestException If the login fails
+   * @throws Exception If the login fails
    */
   private String getQueueSessionId(Map<String, String> sessionIds, String facilityName)
-      throws InternalException, BadRequestException {
+      throws Exception {
     String sessionId = sessionIds.get(facilityName);
     if (sessionId == null) {
       IcatClient icatClient = new IcatClient(FacilityMap.getInstance().getIcatUrl(facilityName));
@@ -297,7 +299,9 @@ public class StatusCheck {
       String plugin = properties.getProperty("queue.account." + facilityName + ".plugin");
       String username = properties.getProperty("queue.account." + facilityName + ".username");
       String password = properties.getProperty("queue.account." + facilityName + ".password");
-      sessionId = icatClient.login(plugin, username, password);
+      String jsonString = icatClient.login(plugin, username, password);
+      JsonObject jsonObject = Utils.parseJsonObject(jsonString);
+      sessionId = jsonObject.getString("sessionId");
       sessionIds.put(facilityName, sessionId);
     }
     return sessionId;
@@ -315,7 +319,7 @@ public class StatusCheck {
    */
   public void startQueuedDownloads(int maxActiveDownloads) throws Exception {
     if (maxActiveDownloads == 0) {
-      logger.debug("Preparing of queued jobs disabled by config, skipping");
+      logger.trace("Preparing of queued jobs disabled by config, skipping");
       return;
     }
 
@@ -332,7 +336,7 @@ public class StatusCheck {
       int activeDownloadsSize = activeDownloads.size();
       if (activeDownloadsSize >= maxActiveDownloads) {
         String format = "More downloads currently RESTORING {} than maxActiveDownloads {}, cannot prepare queued jobs";
-        logger.info(format, activeDownloadsSize, maxActiveDownloads);
+        logger.trace(format, activeDownloadsSize, maxActiveDownloads);
         return;
       }
       availableDownloads -= activeDownloadsSize;
@@ -346,13 +350,13 @@ public class StatusCheck {
     Map<String, String> sessionIds = new HashMap<>();
     if (maxActiveDownloads <= 0) {
       // No limits on how many to submit
-      logger.info("Preparing {} queued downloads", queuedDownloads.size());
+      logger.trace("Preparing {} queued downloads", queuedDownloads.size());
       for (Download queuedDownload : queuedDownloads) {
         queuedDownload.setStatus(DownloadStatus.PREPARING);
         prepareDownload(queuedDownload, null, getQueueSessionId(sessionIds, queuedDownload.getFacilityName()));
       }
     } else {
-      logger.info("Preparing up to {} queued downloads", availableDownloads);
+      logger.trace("Preparing up to {} queued downloads", availableDownloads);
       HashMap<Integer, List<Download>> mapping = new HashMap<>();
       for (Download queuedDownload : queuedDownloads) {
         String sessionId = getQueueSessionId(sessionIds, queuedDownload.getFacilityName());

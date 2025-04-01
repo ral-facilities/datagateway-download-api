@@ -1,7 +1,9 @@
 package org.icatproject.topcat;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.ArrayList;
@@ -20,6 +22,30 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class IcatClient {
+
+	public class DatafilesResponse {
+		public final List<Long> ids = new ArrayList<>();
+		public final Set<String> missing = new HashSet<>();
+		public long totalSize = 0L;
+
+		/**
+		 * Submit a query for Datafiles, then appends the ids, increments the size, and
+		 * records any missing file locations.
+		 * 
+		 * @param query Query to submit
+		 * @throws TopcatException If the query returns not authorized, or not found.
+		 */
+		public void submitDatafilesQuery(String query)
+				throws TopcatException {
+			JsonArray jsonArray = submitQuery(query);
+			for (JsonObject jsonObject : jsonArray.getValuesAs(JsonObject.class)) {
+				JsonObject datafile = jsonObject.getJsonObject("Datafile");
+				ids.add(datafile.getJsonNumber("id").longValueExact());
+				missing.remove(datafile.getString("location"));
+				totalSize += datafile.getJsonNumber("fileSize").longValueExact();
+			}
+		}
+	}
 
 	private Logger logger = LoggerFactory.getLogger(IcatClient.class);
 
@@ -139,7 +165,7 @@ public class IcatClient {
 	 * @throws TopcatException
 	 */
 	public JsonArray getDatasets(String visitId) throws TopcatException {
-			String query = "SELECT dataset.id, dataset.fileCount from Dataset dataset";
+			String query = "SELECT dataset.id, dataset.fileCount, dataset.fileSize from Dataset dataset";
 			query += " WHERE dataset.investigation.visitId = '" + visitId + "' ORDER BY dataset.id";
 		return submitQuery(query);
 	}
@@ -153,45 +179,44 @@ public class IcatClient {
 	 * @throws TopcatException
 	 * @throws UnsupportedEncodingException 
 	 */
-	public List<Long> getDatafiles(List<String> files) throws TopcatException, UnsupportedEncodingException {
-		List<Long> datafileIds = new ArrayList<>();
+	public DatafilesResponse getDatafiles(List<String> files) throws TopcatException, UnsupportedEncodingException {
+		DatafilesResponse response = new DatafilesResponse();
 		if (files.size() == 0) {
 			// Ensure that we don't error when calling .next() below by returning early
-			return datafileIds;
+			return response;
 		}
 
 		// Total limit - "entityManager?sessionId=" - `sessionId` - "?query=" - `queryPrefix` - `querySuffix
-		// Limit is 1024 - 24 - 36 - 7 - 51 - 17
+		// Limit is 1024 - 24 - 36 - 7 - 48 - 17
 		int getUrlLimit = Integer.parseInt(Properties.getInstance().getProperty("getUrlLimit", "1024"));
-		int chunkLimit = getUrlLimit - 135;
-		String queryPrefix = "SELECT d.id from Datafile d WHERE d.location in (";
+		int chunkLimit = getUrlLimit - 132;
+		String queryPrefix = "SELECT d from Datafile d WHERE d.location in (";
 		String querySuffix = ") ORDER BY d.id";
 		ListIterator<String> iterator = files.listIterator();
 
-		String chunkedFiles = "'" + iterator.next() + "'";
+		String file = iterator.next();
+		String chunkedFiles = "'" + file + "'";
+		response.missing.add(file);
 		int chunkSize = URLEncoder.encode(chunkedFiles, "UTF8").length();
 		while (iterator.hasNext()) {
-			String file = "'" + iterator.next() + "'";
-			int encodedFileLength = URLEncoder.encode(file, "UTF8").length();
+			file = iterator.next();
+			String quotedFile = "'" + file + "'";
+			int encodedFileLength = URLEncoder.encode(quotedFile, "UTF8").length();
 			if (chunkSize + 3 + encodedFileLength > chunkLimit) {
-				JsonArray jsonArray = submitQuery(queryPrefix + chunkedFiles + querySuffix);
-				for (JsonNumber datafileIdJsonNumber : jsonArray.getValuesAs(JsonNumber.class)) {
-					datafileIds.add(datafileIdJsonNumber.longValueExact());
-				}
+				response.submitDatafilesQuery(queryPrefix + chunkedFiles + querySuffix);
 
-				chunkedFiles = file;
+				chunkedFiles = quotedFile;
 				chunkSize = encodedFileLength;
+				response.missing.add(file);
 			} else {
-				chunkedFiles += "," + file;
+				chunkedFiles += "," + quotedFile;
 				chunkSize += 3 + encodedFileLength;  // 3 is size of , when encoded as %2C
+				response.missing.add(file);
 			}
 		}
-		JsonArray jsonArray = submitQuery(queryPrefix + chunkedFiles + querySuffix);
-		for (JsonNumber datafileIdJsonNumber : jsonArray.getValuesAs(JsonNumber.class)) {
-			datafileIds.add(datafileIdJsonNumber.longValueExact());
-		}
+		response.submitDatafilesQuery(queryPrefix + chunkedFiles + querySuffix);
 	
-		return datafileIds;
+		return response;
 	}
 
 	/**
@@ -205,6 +230,21 @@ public class IcatClient {
 	 */
 	public long getDatasetFileCount(long datasetId) throws TopcatException {
 			String query = "SELECT COUNT(datafile) FROM Datafile datafile WHERE datafile.dataset.id = " + datasetId;
+		JsonArray jsonArray = submitQuery(query);
+		return jsonArray.getJsonNumber(0).longValueExact();
+	}
+
+	/**
+	 * Utility method to get the fileSize (not size) of a Dataset by SELECTing its
+	 * child Datafiles. Ideally the fileSize field should be used, this is a
+	 * fallback option if that field is not set.
+	 * 
+	 * @param datasetId ICAT Dataset.id
+	 * @return The total size of Datafiles in the specified Dataset
+	 * @throws TopcatException
+	 */
+	public long getDatasetFileSize(long datasetId) throws TopcatException {
+			String query = "SELECT SUM(datafile.fileSize) FROM Datafile datafile WHERE datafile.dataset.id = " + datasetId;
 		JsonArray jsonArray = submitQuery(query);
 		return jsonArray.getJsonNumber(0).longValueExact();
 	}
@@ -237,6 +277,11 @@ public class IcatClient {
 
 	/**
 	 * Gets a single Entity of the specified type, without any other conditions.
+	 * 
+	 * NOTE: This function is written and intended for getting Investigation,
+	 * Dataset or Datafile entities as part of the tests. It does not handle casing of
+	 * entities containing multiple words, or querying for a specific instance of an
+	 * entity.
 	 * 
 	 * @param entityType Type of ICAT Entity to get
 	 * @return A single ICAT Entity of the specified type as a JsonObject
@@ -391,7 +436,8 @@ public class IcatClient {
 			}
 		}
 
-		if (!userName.startsWith(Properties.getInstance().getProperty("anonUserName"))) {
+		String anonUserName = Properties.getInstance().getProperty("anonUserName");
+		if (anonUserName == null || !userName.startsWith(anonUserName)) {
 			// The anonymous cart username will end with the user's sessionId so cannot do .equals
 			return priorityMap.getAuthenticatedPriority();
 		} else {

@@ -108,7 +108,11 @@ queue.maxActiveDownloads = 10
 # Limit the number files per queued Download part. Multiple Datasets will be combined into part
 # Downloads based on their fileCount up to this limit. If a single Dataset has a fileCount
 # greater than this limit, it will still be submitted in a part by itself.
-queue.maxFileCount = 10000
+queue.visit.maxPartFileCount = 10000
+
+# Requests to the /queue/files endpoint will be rejected if they exceed this number of files
+# Any chunking should be done clientside
+queue.files.maxFileCount = 10000
 
 # When queueing Downloads a positive priority will allow a User to proceed.
 # Non-positive values will block that User from submitting a request to the queue.

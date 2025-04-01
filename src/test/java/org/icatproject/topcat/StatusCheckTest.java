@@ -762,17 +762,12 @@ public class StatusCheckTest {
 
 			statusCheck.startQueuedDownloads(-1);
 
-			// All Downloads should have been prepared, but because they have dummy
-			// (non-UUID) sessionId when prepareData is called it will throw and then mark
-			// the Downloads as EXPIRED as part of the error handling. This is OK, as it
-			// still indicates startQueuedDownloads called prepareData
-
 			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
 			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
 
-			assertEquals(DownloadStatus.EXPIRED, postDownload1.getStatus());
+			assertEquals(DownloadStatus.PREPARING, postDownload1.getStatus());
 			assertNull(postDownload1.getPreparedId());
-			assertEquals(DownloadStatus.EXPIRED, postDownload2.getStatus());
+			assertEquals(DownloadStatus.PREPARING, postDownload2.getStatus());
 			assertNull(postDownload2.getPreparedId());
 		} finally {
 			// clean up
@@ -821,15 +816,10 @@ public class StatusCheckTest {
 
 			statusCheck.startQueuedDownloads(1);
 
-			// Should schedule only the first download, but because it has a dummy
-			// (non-UUID) sessionId when prepareData is called it will throw and then mark
-			// the Download as EXPIRED as part of the error handling. This is OK, as it
-			// still indicates startQueuedDownloads called prepareData
-
 			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
 			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
 
-			assertEquals(DownloadStatus.EXPIRED, postDownload1.getStatus());
+			assertEquals(DownloadStatus.PREPARING, postDownload1.getStatus());
 			assertNull(postDownload1.getPreparedId());
 			assertEquals(DownloadStatus.PAUSED, postDownload2.getStatus());
 			assertNull(postDownload2.getPreparedId());

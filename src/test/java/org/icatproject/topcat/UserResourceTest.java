@@ -309,6 +309,7 @@ public class UserResourceTest {
 				assertEquals("simple/root", download.getUserName());
 				assertEquals("simple/root", download.getFullName());
 				assertEquals("", download.getEmail());
+				assertNotEquals(0L, download.getSize());
 				part += 1;
 			}
 		} finally {
@@ -319,49 +320,110 @@ public class UserResourceTest {
 	}
 
 	@Test
+	public void testQueueVisitIdBadRequest() throws Exception {
+		System.out.println("DEBUG testQueueVisitIdBadRequest");
+		String facilityName = "LILS";
+		String transport = "http";
+		String email = "";
+		ThrowingRunnable runnable = () -> userResource.queueVisitId(facilityName, sessionId, transport, null, email, null);
+		Throwable throwable = assertThrows(BadRequestException.class, runnable);
+		assertEquals("(400) : visitId must be provided", throwable.getMessage());
+
+		runnable = () -> userResource.queueVisitId(facilityName, sessionId, transport, null, email, "");
+		throwable = assertThrows(BadRequestException.class, runnable);
+		assertEquals("(400) : visitId must be provided", throwable.getMessage());
+	}
+
+	@Test
+	public void testQueueVisitIdNotFound() throws Exception {
+		System.out.println("DEBUG testQueueVisitIdBadRequest");
+		String facilityName = "LILS";
+		String transport = "http";
+		String email = "";
+		String visitId = "test";
+		ThrowingRunnable runnable = () -> userResource.queueVisitId(facilityName, sessionId, transport, null, email, visitId);
+		Throwable throwable = assertThrows(NotFoundException.class, runnable);
+		assertEquals("(404) : No Datasets found for " + visitId, throwable.getMessage());
+	}
+
+	@Test
 	public void testQueueFiles() throws Exception {
 		System.out.println("DEBUG testQueueFiles");
-		List<Long> downloadIds = new ArrayList<>();
+		Long downloadId = null;
 		try {
 			String facilityName = "LILS";
 			String transport = "http";
 			String email = "";
-			
+			String file = "abcdefghijklmnopqrstuvwxyz";
 			IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
-			List<JsonObject> datafiles = icatClient.getEntities("datafile", 3L);
+			List<JsonObject> datafiles = icatClient.getEntities("datafile", 2L);
 			List<String> files = new ArrayList<>();
+			files.add(file);
 			for (JsonObject datafile : datafiles) {
 				files.add(datafile.getString("location"));
 			}
 			Response response = userResource.queueFiles(facilityName, sessionId, transport, null, email, files);
 			assertEquals(200, response.getStatus());
-
-			JsonArray downloadIdsArray = Utils.parseJsonArray(response.getEntity().toString());
-			long part = 1;
-			for (JsonNumber downloadIdJson : downloadIdsArray.getValuesAs(JsonNumber.class)) {
-				long downloadId = downloadIdJson.longValueExact();
-				downloadIds.add(downloadId);
-			}
-			assertEquals(3, downloadIds.size());
-			for (long downloadId : downloadIds) {
-				Download download = downloadRepository.getDownload(downloadId);
-				assertNull(download.getPreparedId());
-				assertEquals(DownloadStatus.PAUSED, download.getStatus());
-				assertEquals(0, download.getInvestigationIds().size());
-				assertEquals(0, download.getDatasetIds().size());
-				assertEquals(1, download.getDatafileIds().size());
-				assertEquals("LILS_files_part_" + part + "_of_3", download.getFileName());
-				assertEquals(transport, download.getTransport());
-				assertEquals("simple/root", download.getUserName());
-				assertEquals("simple/root", download.getFullName());
-				assertEquals("", download.getEmail());
-				part += 1;
-			}
+			JsonObject responseObject = Utils.parseJsonObject(response.getEntity().toString());
+			downloadId = responseObject.getJsonNumber("downloadId").longValueExact();
+			JsonArray missingArray = responseObject.getJsonArray("notFound");
+			assertEquals(1, missingArray.size());
+			assertEquals(file, missingArray.getString(0));
+			Download download = downloadRepository.getDownload(downloadId);
+			assertNull(download.getPreparedId());
+			assertEquals(DownloadStatus.PAUSED, download.getStatus());
+			assertEquals(0, download.getInvestigationIds().size());
+			assertEquals(0, download.getDatasetIds().size());
+			assertEquals(2, download.getDatafileIds().size());
+			assertEquals("LILS_files", download.getFileName());
+			assertEquals(transport, download.getTransport());
+			assertEquals("simple/root", download.getUserName());
+			assertEquals("simple/root", download.getFullName());
+			assertEquals("", download.getEmail());
+			assertNotEquals(0L, download.getSize());
 		} finally {
-			for (long downloadId : downloadIds) {
+			if (downloadId != null) {
 				downloadRepository.removeDownload(downloadId);
 			}
 		}
+	}
+
+	@Test
+	public void testQueueFilesBadRequestEmpty() throws Exception {
+		System.out.println("DEBUG testQueueFilesBadRequestEmpty");
+		String facilityName = "LILS";
+		String transport = "http";
+		String email = "";
+		ThrowingRunnable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, null);
+		Throwable throwable = assertThrows(BadRequestException.class, runnable);
+		assertEquals("(400) : At least one Datafile.location required", throwable.getMessage());
+
+		runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, new ArrayList<>());
+		throwable = assertThrows(BadRequestException.class, runnable);
+		assertEquals("(400) : At least one Datafile.location required", throwable.getMessage());
+	}
+
+	@Test
+	public void testQueueFilesBadRequestTooMany() throws Exception {
+		System.out.println("DEBUG testQueueFilesBadRequestTooMany");
+		String facilityName = "LILS";
+		String transport = "http";
+		String email = "";
+		List<String> files = List.of("1", "2", "3", "4");
+		ThrowingRunnable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, files);
+		Throwable throwable = assertThrows(BadRequestException.class, runnable);
+		assertEquals("(400) : Limit of 3 files exceeded", throwable.getMessage());
+	}
+
+	@Test
+	public void testQueueFilesNotFound() throws Exception {
+		System.out.println("DEBUG testQueueFilesNotFound");
+		String facilityName = "LILS";
+		String transport = "http";
+		String email = "";
+		ThrowingRunnable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, List.of("test"));
+		Throwable throwable = assertThrows(NotFoundException.class, runnable);
+		assertEquals("(404) : No Datafiles found", throwable.getMessage());
 	}
 
 	@Test
