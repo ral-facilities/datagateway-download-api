@@ -74,7 +74,7 @@ public class DownloadRepository {
 				sb.append("WHERE " + queryOffset + " ");
 			}
 
-			logger.debug(sb.toString());
+			logger.trace(sb.toString());
 
 			TypedQuery<Download> query = em.createQuery(sb.toString(), Download.class);
 
@@ -87,7 +87,7 @@ public class DownloadRepository {
 				query.setMaxResults(limitPageSize);
 			}
 
-			logger.debug(query.toString());
+			logger.trace(query.toString());
 
 			downloads = query.getResultList();
 

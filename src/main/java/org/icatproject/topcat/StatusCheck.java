@@ -50,6 +50,7 @@ public class StatusCheck {
   private static final Logger logger = LoggerFactory.getLogger(StatusCheck.class);
   private Map<Long, Date> lastChecks = new HashMap<Long, Date>();
   private AtomicBoolean busy = new AtomicBoolean(false);
+  private AtomicBoolean busyQueue = new AtomicBoolean(false);
 
   @PersistenceContext(unitName="topcat")
   EntityManager em;
@@ -75,19 +76,45 @@ public class StatusCheck {
       Properties properties = Properties.getInstance();
       int pollDelay = Integer.valueOf(properties.getProperty("poll.delay", "600"));
       int pollIntervalWait = Integer.valueOf(properties.getProperty("poll.interval.wait", "600"));
+
+      // For testing, separate out the poll body into its own method
+      // And allow test configurations to disable scheduled status checks
+      if (!Boolean.valueOf(properties.getProperty("test.disableDownloadStatusChecks", "false"))) {
+        updateStatuses(pollDelay, pollIntervalWait, null);
+      }
+
+    } catch (Exception e) {
+      logger.error(e.getMessage());
+    } finally {
+      busy.set(false);
+    }
+  }
+  
+  @Schedule(hour = "*", minute = "*", second = "*")
+  private void pollQueue() {
+	  
+    // Observation: glassfish may already prevent multiple executions, and may even
+    // count the attempt as an error, so it is possible that the use of a semaphore
+    // here is redundant.
+	  
+    if (!busyQueue.compareAndSet(false, true)) {
+      return;
+    }
+
+    try {
+      Properties properties = Properties.getInstance();
       int maxActiveDownloads = Integer.valueOf(properties.getProperty("queue.maxActiveDownloads", "1"));
 
       // For testing, separate out the poll body into its own method
       // And allow test configurations to disable scheduled status checks
       if (!Boolean.valueOf(properties.getProperty("test.disableDownloadStatusChecks", "false"))) {
-          updateStatuses(pollDelay, pollIntervalWait, null);   	  
         startQueuedDownloads(maxActiveDownloads);
       }
-      
+
     } catch (Exception e) {
       logger.error(e.getMessage());
     } finally {
-      busy.set(false);
+      busyQueue.set(false);
     }
   }
   
@@ -246,8 +273,9 @@ public class StatusCheck {
       if( idsClient == null ) {
     	  idsClient = new IdsClient(getDownloadUrl(download.getFacilityName(),download.getTransport()));
       }
-      logger.info("Requesting prepareData for Download " + download.getFileName());
+      logger.info("Requesting prepareData for Download " + download.getFileName() + " " + download.getId());
       String preparedId = idsClient.prepareData(sessionId, download.getInvestigationIds(), download.getDatasetIds(), download.getDatafileIds());
+      logger.info("Received preparedId " + preparedId + " for Download " + download.getFileName() + " " + download.getId());
       download.setPreparedId(preparedId);
 
       try {
