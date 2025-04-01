@@ -104,49 +104,51 @@ except Exception as e:
     sys.exit("Couldn't determine sessionId: " + str(e) + "; response: " + response.text)
 
 def show_download():
-	download_id = input("Enter download id: ")
-	print(requests.get(topcat_url + "/admin/downloads", params={
-		"facilityName": facility_name,
-		"sessionId": session_id,
-		"queryOffset": "where download.id = " + download_id
-	}, verify=verifySsl).text)
+	download_ids = input("Enter download id(s): ")
+	for download_id in download_ids.split():
+		print(requests.get(topcat_url + "/admin/downloads", params={
+			"facilityName": facility_name,
+			"sessionId": session_id,
+			"queryOffset": "where download.id = " + download_id
+		}, verify=verifySsl).text)
 
 
 def list_file_locations():
-	download_id = input("Enter download id: ")
-	output_file_name = input("Output file name (optional): ")
-	download = json.loads(requests.get(topcat_url + "/admin/downloads", params={
-		"facilityName": facility_name,
-		"sessionId": session_id,
-		"queryOffset": "where download.id = " + download_id
-	}, verify=verifySsl).text)[0]
-	download_items = download["downloadItems"]
-	datafile_locations = []
-	for download_item in download_items:
-		if download_item["entityType"] == "investigation":
-			datafile_locations.extend(json.loads(requests.get(icat_url + "/entityManager", params={
-				"sessionId": session_id,
-				"query": "select datafile.location from Datafile datafile, datafile.dataset as dataset, dataset.investigation as investigation where investigation.id = " + str(download_item["entityId"])
-			}, verify=verifySsl).text))
-		elif download_item["entityType"] == "dataset":
-			datafile_locations.extend(json.loads(requests.get(icat_url + "/entityManager", params={
-				"sessionId": session_id,
-				"query": "select datafile.location from Datafile datafile, datafile.dataset as dataset where dataset.id = " + str(download_item["entityId"])
-			}, verify=verifySsl).text))
-		elif download_item["entityType"] == "datafile":
-			datafile_locations.extend(json.loads(requests.get(icat_url + "/entityManager", params={
-				"sessionId": session_id,
-				"query": "select datafile.location from Datafile datafile where datafile.id = " + str(download_item["entityId"])
-			}, verify=verifySsl).text))
-	datafile_locations.sort()
-	if output_file_name != "":
-		file  = open(output_file_name, "w")
-		for datafile_location in datafile_locations:
-			file.write(datafile_location + "\n")
-		file.close()
-	else:
-		for datafile_location in datafile_locations:
-			print(datafile_location)
+	download_ids = input("Enter download id(s): ")
+	for download_id in download_ids.split():
+		output_file_name = input("Output file name (optional): ")
+		download = json.loads(requests.get(topcat_url + "/admin/downloads", params={
+			"facilityName": facility_name,
+			"sessionId": session_id,
+			"queryOffset": "where download.id = " + download_id
+		}, verify=verifySsl).text)[0]
+		download_items = download["downloadItems"]
+		datafile_locations = []
+		for download_item in download_items:
+			if download_item["entityType"] == "investigation":
+				datafile_locations.extend(json.loads(requests.get(icat_url + "/entityManager", params={
+					"sessionId": session_id,
+					"query": "select datafile.location from Datafile datafile, datafile.dataset as dataset, dataset.investigation as investigation where investigation.id = " + str(download_item["entityId"])
+				}, verify=verifySsl).text))
+			elif download_item["entityType"] == "dataset":
+				datafile_locations.extend(json.loads(requests.get(icat_url + "/entityManager", params={
+					"sessionId": session_id,
+					"query": "select datafile.location from Datafile datafile, datafile.dataset as dataset where dataset.id = " + str(download_item["entityId"])
+				}, verify=verifySsl).text))
+			elif download_item["entityType"] == "datafile":
+				datafile_locations.extend(json.loads(requests.get(icat_url + "/entityManager", params={
+					"sessionId": session_id,
+					"query": "select datafile.location from Datafile datafile where datafile.id = " + str(download_item["entityId"])
+				}, verify=verifySsl).text))
+		datafile_locations.sort()
+		if output_file_name != "":
+			file  = open(output_file_name, "w")
+			for datafile_location in datafile_locations:
+				file.write(datafile_location + "\n")
+			file.close()
+		else:
+			for datafile_location in datafile_locations:
+				print(datafile_location)
 
 
 def prepare_download():
@@ -182,15 +184,23 @@ def prepare_download():
 	print("UPDATE DOWNLOAD set PREPARED_ID = '" + prepared_id + "', STATUS = 'RESTORING' WHERE ID = " + download_id)
 
 
-
-
 def expire_download():
-	download_id = input("Enter download id: ")
-	requests.put(topcat_url + "/admin/download/" + download_id +  "/status", data={
-		"facilityName": facility_name,
-		"sessionId": session_id,
-		"value": "EXPIRED"
-	}, verify=verifySsl)
+	download_ids = input("Enter download id(s): ")
+	for download_id in download_ids.split():
+		_expire_download(download_id=download_id)
+
+
+def _expire_download(download_id):
+	requests.put(
+		topcat_url + "/admin/download/" + download_id +  "/status",
+		data={
+			"facilityName": facility_name,
+			"sessionId": session_id,
+			"value": "EXPIRED"
+		},
+		verify=verifySsl,
+	)
+
 
 def expire_all_pending_downloads():
 	query = "(download.status like 'PREPARING' or download.status like 'RESTORING') and download.isDeleted = false"
@@ -350,8 +360,9 @@ def show_all_queued_downloads():
 
 
 def start_queued_download():
-	download_id = input("Enter download id: ")
-	prepare_download(download_id=download_id)
+	download_ids = input("Enter download id(s): ")
+	for download_id in download_ids.split():
+		prepare_download(download_id=download_id)
 
 
 def start_queued_downloads():
@@ -362,14 +373,22 @@ def start_queued_downloads():
 
 
 def requeue_download():
-	download_id = input("Enter download id: ")
-	data = {
-		"facilityName": facility_name,
-		"sessionId": session_id,
-		"value": "PAUSED"
-	}
-	url = topcat_url + "/admin/download/" + download_id +  "/status"
-	requests.put(url=url, data=data, verify=verifySsl)
+	download_ids = input("Enter download id(s): ")
+	for download_id in download_ids.split():
+		data = {
+			"facilityName": facility_name,
+			"sessionId": session_id,
+			"value": "PAUSED"
+		}
+		url = topcat_url + "/admin/download/" + download_id +  "/status"
+		requests.put(url=url, data=data, verify=verifySsl)
+
+
+def expire_all_queued_downloads():
+	text = get_all_queued_downloads()
+	downloads = json.loads(text)
+	for download in  downloads:
+		_expire_download(str(download["id"]))
 
 
 while True:
@@ -387,7 +406,8 @@ while True:
 	print(" * 10: Start a queued download.")
 	print(" * 11: Start all queued downloads.")
 	print(" * 12: Re-queue expired download.")
-	print(" * 13: Exit")
+	print(" * 13: Expire all queued download.")
+	print(" * 14: Exit")
 
 	option_number = input("Enter option number: ");
 
@@ -417,6 +437,8 @@ while True:
 	elif option_number == "12":
 		requeue_download()
 	elif option_number == "13":
+		expire_all_queued_downloads()
+	elif option_number == "14":
 		break
 	else:
 		print("")
