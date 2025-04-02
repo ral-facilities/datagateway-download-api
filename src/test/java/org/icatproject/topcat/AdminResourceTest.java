@@ -244,7 +244,7 @@ public class AdminResourceTest {
 			String facilityName = "LILS";
 			testDownload.setFacilityName(facilityName);
 			testDownload.setSessionId(adminSessionId);
-			testDownload.setStatus(DownloadStatus.PAUSED);
+			testDownload.setStatus(DownloadStatus.QUEUED);
 			testDownload.setIsDeleted(false);
 			testDownload.setUserName("simple/root");
 			testDownload.setFileName("testFile.txt");

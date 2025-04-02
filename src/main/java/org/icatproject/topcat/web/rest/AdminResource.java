@@ -176,7 +176,7 @@ public class AdminResource {
             throw new NotFoundException("could not find download");
         }
 
-        if (download.getPreparedId() == null && value.equals("RESTORING")) {
+        if (download.getStatus().equals(DownloadStatus.QUEUED) && value.equals("RESTORING")) {
             // Queued jobs need to be marked PREPARING first to generate a preparedId before RESTORING
             download.setStatus(DownloadStatus.PREPARING);
         } else {

@@ -760,9 +760,9 @@ public class StatusCheckTest {
 		try {
 			String transport = "http";
 			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.PAUSED, false, downloadRepository);
+					DownloadStatus.QUEUED, false, downloadRepository);
 			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.PAUSED, false, downloadRepository);
+					DownloadStatus.QUEUED, false, downloadRepository);
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
@@ -789,16 +789,16 @@ public class StatusCheckTest {
 		try {
 			String transport = "http";
 			Download dummyDownload = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.PAUSED, false, downloadRepository);
+					DownloadStatus.QUEUED, false, downloadRepository);
 			downloadId = dummyDownload.getId();
 
 			statusCheck.startQueuedDownloads(0);
 
-			// Download status should still be PAUSED, as we unqueued a max of 0 downloads
+			// Download status should still be QUEUED, as we unqueued a max of 0 downloads
 
 			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
-			assertEquals(DownloadStatus.PAUSED, postDownload.getStatus());
+			assertEquals(DownloadStatus.QUEUED, postDownload.getStatus());
 			assertNull(postDownload.getPreparedId());
 		} finally {
 			// clean up
@@ -815,9 +815,9 @@ public class StatusCheckTest {
 		try {
 			String transport = "http";
 			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.PAUSED, false, downloadRepository);
+					DownloadStatus.QUEUED, false, downloadRepository);
 			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.PAUSED, false, downloadRepository);
+					DownloadStatus.QUEUED, false, downloadRepository);
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
@@ -828,7 +828,7 @@ public class StatusCheckTest {
 
 			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
 			assertNotNull(postDownload1.getPreparedId());
-			assertEquals(DownloadStatus.PAUSED, postDownload2.getStatus());
+			assertEquals(DownloadStatus.QUEUED, postDownload2.getStatus());
 			assertNull(postDownload2.getPreparedId());
 		} finally {
 			// clean up
@@ -847,7 +847,7 @@ public class StatusCheckTest {
 			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", "preparedId", transport, true,
 					DownloadStatus.RESTORING, false, downloadRepository);
 			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.PAUSED, false, downloadRepository);
+					DownloadStatus.QUEUED, false, downloadRepository);
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
@@ -861,8 +861,8 @@ public class StatusCheckTest {
 
 			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
 			assertNotNull("Expected RESTORING Download to still have preparedId set", postDownload1.getPreparedId());
-			assertEquals(DownloadStatus.PAUSED, postDownload2.getStatus());
-			assertNull("Expected PAUSED Download to not have preparedId set", postDownload2.getPreparedId());
+			assertEquals(DownloadStatus.QUEUED, postDownload2.getStatus());
+			assertNull("Expected QUEUED Download to not have preparedId set", postDownload2.getPreparedId());
 		} finally {
 			// clean up
 			TestHelpers.deleteDummyDownload(downloadId1, downloadRepository);
