@@ -90,7 +90,7 @@ public class StatusCheck {
     }
   }
   
-  @Schedule(hour = "*", minute = "*", second = "*")
+  @Schedule(hour = "*", minute = "*/10", second = "0")
   private void pollQueue() {
 	  
     // Observation: glassfish may already prevent multiple executions, and may even
