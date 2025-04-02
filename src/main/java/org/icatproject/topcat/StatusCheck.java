@@ -308,8 +308,7 @@ public class StatusCheck {
   }
 
   /**
-   * Prepares Downloads which are queued (PAUSED with no preparedId) up to the
-   * maxActiveDownloads limit.
+   * Prepares Downloads which are QUEUED up to the maxActiveDownloads limit.
    * Downloads will be prepared in order of priority, with all Downloads from
    * Users with a value of 1 being prepared first, then 2 and so on.
    * 
@@ -325,7 +324,7 @@ public class StatusCheck {
 
     String selectString = "select download from Download download where download.isDeleted != true";
     String restoringCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.RESTORING";
-    String pausedCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.PAUSED";
+    String queuedCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.QUEUED";
 
     int availableDownloads = maxActiveDownloads;
     if (maxActiveDownloads > 0) {
@@ -342,7 +341,7 @@ public class StatusCheck {
       availableDownloads -= activeDownloadsSize;
     }
 
-    String queuedQueryString = selectString + " and " + pausedCondition + " and download.preparedId = null";
+    String queuedQueryString = selectString + " and " + queuedCondition;
     queuedQueryString += " order by download.createdAt";
     TypedQuery<Download> queuedDownloadsQuery = em.createQuery(queuedQueryString, Download.class);
     List<Download> queuedDownloads = queuedDownloadsQuery.getResultList();
