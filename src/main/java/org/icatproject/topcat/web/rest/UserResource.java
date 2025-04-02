@@ -321,8 +321,8 @@ public class UserResource {
 		if (!download.getUserName().equals(cartUserName)) {
 			throw new ForbiddenException("you do not have permission to delete this download");
 		}
-        if (download.getPreparedId() == null) {
-            throw new ForbiddenException("Cannot modify status of a download before it's prepared");
+        if (download.getStatus() == DownloadStatus.QUEUED) {
+            throw new ForbiddenException("Cannot modify status of a QUEUED Download");
         }
 
         download.setStatus(DownloadStatus.valueOf(value));
@@ -942,7 +942,7 @@ public class UserResource {
 		for (Download download : downloads) {
 			String partFilename = formatQueuedFilename(fileName, part, downloads.size());
 			download.setFileName(partFilename);
-			downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
+			downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED);
 			jsonArrayBuilder.add(downloadId);
 			part += 1;
 		}
@@ -1029,7 +1029,7 @@ public class UserResource {
 		download.setDownloadItems(downloadItems);
 		download.setSize(response.totalSize);
 
-		long downloadId = submitDownload(idsClient, download, DownloadStatus.PAUSED);
+		long downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED);
 
 		JsonObjectBuilder jsonObjectBuilder = Json.createObjectBuilder();
 		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();

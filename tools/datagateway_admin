@@ -324,9 +324,10 @@ def queue_files():
 
 
 def get_all_queued_downloads():
-	query_offset = "WHERE download.isDeleted != true"
-	query_offset += " AND download.status = org.icatproject.topcat.domain.DownloadStatus.PAUSED"
-	query_offset += " AND download.preparedId = null"
+	query_offset = (
+		"WHERE download.isDeleted != true"
+		" AND download.status = org.icatproject.topcat.domain.DownloadStatus.QUEUED"
+	)
 	params = {
 		"facilityName": facility_name,
 		"sessionId": session_id,
@@ -366,7 +367,7 @@ def requeue_download():
 	data = {
 		"facilityName": facility_name,
 		"sessionId": session_id,
-		"value": "PAUSED"
+		"value": "QUEUED"
 	}
 	url = topcat_url + "/admin/download/" + download_id +  "/status"
 	requests.put(url=url, data=data, verify=verifySsl)

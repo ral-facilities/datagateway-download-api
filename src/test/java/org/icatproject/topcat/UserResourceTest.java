@@ -300,7 +300,7 @@ public class UserResourceTest {
 			for (long downloadId : downloadIds) {
 				Download download = downloadRepository.getDownload(downloadId);
 				assertNull(download.getPreparedId());
-				assertEquals(DownloadStatus.PAUSED, download.getStatus());
+				assertEquals(DownloadStatus.QUEUED, download.getStatus());
 				assertEquals(0, download.getInvestigationIds().size());
 				assertEquals(1, download.getDatasetIds().size());
 				assertEquals(0, download.getDatafileIds().size());
@@ -371,7 +371,7 @@ public class UserResourceTest {
 			assertEquals(file, missingArray.getString(0));
 			Download download = downloadRepository.getDownload(downloadId);
 			assertNull(download.getPreparedId());
-			assertEquals(DownloadStatus.PAUSED, download.getStatus());
+			assertEquals(DownloadStatus.QUEUED, download.getStatus());
 			assertEquals(0, download.getInvestigationIds().size());
 			assertEquals(0, download.getDatasetIds().size());
 			assertEquals(2, download.getDatafileIds().size());
@@ -444,7 +444,7 @@ public class UserResourceTest {
 			String facilityName = "LILS";
 			testDownload.setFacilityName(facilityName);
 			testDownload.setSessionId(sessionId);
-			testDownload.setStatus(DownloadStatus.PAUSED);
+			testDownload.setStatus(DownloadStatus.QUEUED);
 			testDownload.setIsDeleted(false);
 			testDownload.setUserName("simple/root");
 			testDownload.setFileName("testFile.txt");
@@ -455,14 +455,14 @@ public class UserResourceTest {
 			ForbiddenException exception = assertThrows(ForbiddenException.class, () -> {
 				userResource.setDownloadStatus(testDownload.getId(), facilityName, sessionId, DownloadStatus.RESTORING.toString());
 			});
-			assertEquals("(403) : Cannot modify status of a download before it's prepared", exception.getMessage());
+			assertEquals("(403) : Cannot modify status of a QUEUED Download", exception.getMessage());
 	
 			Response response = userResource.getDownloads(facilityName, sessionId, null);
 			assertEquals(200, response.getStatus());
 			List<Download> downloads = (List<Download>) response.getEntity();
 	
 			Download unmodifiedDownload = findDownload(downloads, downloadId);
-			assertEquals(DownloadStatus.PAUSED, unmodifiedDownload.getStatus());
+			assertEquals(DownloadStatus.QUEUED, unmodifiedDownload.getStatus());
 		} finally {
 			if (downloadId != null) {
 				downloadRepository.removeDownload(downloadId);

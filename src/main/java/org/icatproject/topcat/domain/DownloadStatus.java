@@ -4,5 +4,5 @@ import jakarta.xml.bind.annotation.XmlRootElement;
 
 @XmlRootElement
 public enum DownloadStatus {
-    RESTORING, COMPLETE, EXPIRED, PAUSED, PREPARING
+    RESTORING, COMPLETE, EXPIRED, PAUSED, PREPARING, QUEUED
 }
