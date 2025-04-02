@@ -12,6 +12,8 @@ import jakarta.ejb.EJB;
 import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.httpclient.Response;
 import org.icatproject.topcat.domain.*;
+import org.icatproject.topcat.exceptions.TopcatException;
+
 import java.net.URLEncoder;
 
 import org.icatproject.topcat.repository.CacheRepository;
@@ -236,6 +238,20 @@ public class IcatClientTest {
 
 			httpClient.delete("entityManager?sessionId=" + sessionId + "&entities=" + arrayBuilder.build(), new HashMap<>());
 		}
+	}
+
+	@Test
+	public void testGetDatasetFileCount() throws TopcatException {
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		long datasetId = icatClient.getEntity("Dataset").getJsonNumber("id").longValueExact();
+		assertNotEquals(0, icatClient.getDatasetFileCount(datasetId));
+	}
+
+	@Test
+	public void testGetDatasetFileSize() throws TopcatException {
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		long datasetId = icatClient.getEntity("Dataset").getJsonNumber("id").longValueExact();
+		assertNotEquals(0, icatClient.getDatasetFileSize(datasetId));
 	}
 
 	/*

@@ -86,15 +86,6 @@ public class TestHelpers {
 		download.setPreparedId(preparedId);
 
 		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
-
-		for (int i = 0; i <= 2; i++) {
-			DownloadItem downloadItem = new DownloadItem();
-			downloadItem.setEntityId(10L + i);
-			downloadItem.setEntityType(EntityType.dataset);
-			downloadItem.setDownload(download);
-			downloadItems.add(downloadItem);
-		}
-
 		download.setDownloadItems(downloadItems);
 
 		download.setIsTwoLevel(isTwoLevel);

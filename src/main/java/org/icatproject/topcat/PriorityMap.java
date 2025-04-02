@@ -35,6 +35,10 @@ public class PriorityMap {
         Properties properties = Properties.getInstance();
 
         anonUserName = properties.getProperty("anonUserName", "");
+        if (anonUserName.equals("")) {
+            logger.warn("anonUserName not defined, cannot distinguish anonymous and authenticated users so "
+                    + "authenticated priority will be used as default level");
+        }
         anonDownloadEnabled = Boolean.parseBoolean(properties.getProperty("anonDownloadEnabled", "true"));
         String defaultString;
         if (anonDownloadEnabled) {

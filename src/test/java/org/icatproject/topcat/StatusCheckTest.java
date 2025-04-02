@@ -130,6 +130,11 @@ public class StatusCheckTest {
 	@Inject
 	private StatusCheck statusCheck;
 
+	@BeforeClass
+	public static void beforeAll() {
+		TestHelpers.installTrustManager();
+	}
+
 	@Test
 	@Transactional
 	public void testSimpleDownload() throws Exception {
@@ -749,31 +754,27 @@ public class StatusCheckTest {
 	@Test
 	@Transactional
 	public void testStartQueuedDownloadsNegative() throws Exception {
+		System.out.println("DEBUG testStartQueuedDownloadsNegative");
 		Long downloadId1 = null;
 		Long downloadId2 = null;
 		try {
 			String transport = "http";
 			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.PAUSED, false, downloadRepository);
+					DownloadStatus.QUEUED, false, downloadRepository);
 			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.PAUSED, false, downloadRepository);
+					DownloadStatus.QUEUED, false, downloadRepository);
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
 			statusCheck.startQueuedDownloads(-1);
 
-			// All Downloads should have been prepared, but because they have dummy
-			// (non-UUID) sessionId when prepareData is called it will throw and then mark
-			// the Downloads as EXPIRED as part of the error handling. This is OK, as it
-			// still indicates startQueuedDownloads called prepareData
-
 			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
 			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
 
-			assertEquals(DownloadStatus.EXPIRED, postDownload1.getStatus());
-			assertNull(postDownload1.getPreparedId());
-			assertEquals(DownloadStatus.EXPIRED, postDownload2.getStatus());
-			assertNull(postDownload2.getPreparedId());
+			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
+			assertNotNull(postDownload1.getPreparedId());
+			assertEquals(DownloadStatus.RESTORING, postDownload2.getStatus());
+			assertNotNull(postDownload2.getPreparedId());
 		} finally {
 			// clean up
 			TestHelpers.deleteDummyDownload(downloadId1, downloadRepository);
@@ -788,16 +789,16 @@ public class StatusCheckTest {
 		try {
 			String transport = "http";
 			Download dummyDownload = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.PAUSED, false, downloadRepository);
+					DownloadStatus.QUEUED, false, downloadRepository);
 			downloadId = dummyDownload.getId();
 
 			statusCheck.startQueuedDownloads(0);
 
-			// Download status should still be PAUSED, as we unqueued a max of 0 downloads
+			// Download status should still be QUEUED, as we unqueued a max of 0 downloads
 
 			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
 
-			assertEquals(DownloadStatus.PAUSED, postDownload.getStatus());
+			assertEquals(DownloadStatus.QUEUED, postDownload.getStatus());
 			assertNull(postDownload.getPreparedId());
 		} finally {
 			// clean up
@@ -808,30 +809,26 @@ public class StatusCheckTest {
 	@Test
 	@Transactional
 	public void testStartQueuedDownloadsNonZero() throws Exception {
+		System.out.println("DEBUG testStartQueuedDownloadsNonZero");
 		Long downloadId1 = null;
 		Long downloadId2 = null;
 		try {
 			String transport = "http";
 			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.PAUSED, false, downloadRepository);
+					DownloadStatus.QUEUED, false, downloadRepository);
 			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.PAUSED, false, downloadRepository);
+					DownloadStatus.QUEUED, false, downloadRepository);
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
 			statusCheck.startQueuedDownloads(1);
 
-			// Should schedule only the first download, but because it has a dummy
-			// (non-UUID) sessionId when prepareData is called it will throw and then mark
-			// the Download as EXPIRED as part of the error handling. This is OK, as it
-			// still indicates startQueuedDownloads called prepareData
-
 			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
 			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
 
-			assertEquals(DownloadStatus.EXPIRED, postDownload1.getStatus());
-			assertNull(postDownload1.getPreparedId());
-			assertEquals(DownloadStatus.PAUSED, postDownload2.getStatus());
+			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
+			assertNotNull(postDownload1.getPreparedId());
+			assertEquals(DownloadStatus.QUEUED, postDownload2.getStatus());
 			assertNull(postDownload2.getPreparedId());
 		} finally {
 			// clean up
@@ -850,7 +847,7 @@ public class StatusCheckTest {
 			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", "preparedId", transport, true,
 					DownloadStatus.RESTORING, false, downloadRepository);
 			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.PAUSED, false, downloadRepository);
+					DownloadStatus.QUEUED, false, downloadRepository);
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
@@ -864,8 +861,8 @@ public class StatusCheckTest {
 
 			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
 			assertNotNull("Expected RESTORING Download to still have preparedId set", postDownload1.getPreparedId());
-			assertEquals(DownloadStatus.PAUSED, postDownload2.getStatus());
-			assertNull("Expected PAUSED Download to not have preparedId set", postDownload2.getPreparedId());
+			assertEquals(DownloadStatus.QUEUED, postDownload2.getStatus());
+			assertNull("Expected QUEUED Download to not have preparedId set", postDownload2.getPreparedId());
 		} finally {
 			// clean up
 			TestHelpers.deleteDummyDownload(downloadId1, downloadRepository);

@@ -40,6 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.icatproject.topcat.FacilityMap;
 import org.icatproject.topcat.IcatClient;
+import org.icatproject.topcat.StatusCheck;
 
 @Stateless
 @LocalBean
@@ -175,7 +176,7 @@ public class AdminResource {
             throw new NotFoundException("could not find download");
         }
 
-        if (download.getPreparedId() == null && value.equals("RESTORING")) {
+        if (download.getStatus().equals(DownloadStatus.QUEUED) && value.equals("RESTORING")) {
             // Queued jobs need to be marked PREPARING first to generate a preparedId before RESTORING
             download.setStatus(DownloadStatus.PREPARING);
         } else {
@@ -189,7 +190,42 @@ public class AdminResource {
 
         return Response.ok().build();
     }
-    
+
+    /**
+     * Prepare a possibly expired or deleted Download. Any completion or
+     * deletion date will be unset and isDeleted set to false. A new call to
+     * the IDS will generate a new preparedId and put the job in the RESTORING
+     * state.
+     * 
+     * @param id           Download.id
+     * @param facilityName ICAT Facility.name
+     * @param sessionId    ICAT sessionId
+     * @return OK 200 if successful
+     * @throws MalformedURLException if facilityName is invalid.
+     * @throws TopcatException if anything else goes wrong.
+     */
+    @PUT
+    @Path("/download/{id}/prepare")
+    @Produces({MediaType.APPLICATION_JSON})
+    public Response prepareDownload(@PathParam("id") Long id, @FormParam("facilityName") String facilityName,
+            @FormParam("sessionId") String sessionId) throws TopcatException, MalformedURLException {
+
+        String icatUrl = getIcatUrl(facilityName);
+        onlyAllowAdmin(icatUrl, sessionId);
+
+        Download download = downloadRepository.getDownload(id);
+        if(download == null){
+            throw new NotFoundException("could not find download");
+        }
+
+        download.setIsDeleted(false);
+        download.setDeletedAt(null);
+        download.setCompletedAt(null);
+        StatusCheck.prepareDownload(downloadRepository, download, sessionId, null);
+
+        return Response.ok().build();
+    }
+
     /**
      * Sets whether or not a download is deleted.
      *
