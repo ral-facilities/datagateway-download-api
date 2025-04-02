@@ -150,38 +150,16 @@ def list_file_locations():
 
 
 def prepare_download():
-	download_id = input("Enter download id: ")
-	investigation_ids = []
-	dataset_ids = []
-	datafile_ids = []
-	download = json.loads(requests.get(topcat_url + "/admin/downloads", params={
-		"facilityName": facility_name,
-		"sessionId": session_id,
-		"queryOffset": "where download.id = " + download_id
-	}, verify=verifySsl).text)[0]
-	download_items = download["downloadItems"]
-	for download_item in download_items:
-		if download_item["entityType"] == "investigation":
-			investigation_ids.append(download_item["entityId"])
-		elif download_item["entityType"] == "dataset":
-			dataset_ids.append(download_item["entityId"])
-		elif download_item["entityType"] == "datafile":
-			datafile_ids.append(download_item["entityId"])
-	params = {
-		"zip": "true",
-		"sessionId": session_id
-	}
-	if (len(investigation_ids) > 0):
-		params["investigationIds"] = ",".join(map(str, investigation_ids))
-	if (len(dataset_ids) > 0):
-		params["datasetIds"] = ",".join(map(str, dataset_ids))
-	if (len(datafile_ids) > 0):
-		params["datafileIds"] = ",".join(map(str, datafile_ids))
-	prepared_id = requests.post(ids_url + "/prepareData", data=params, verify=verifySsl).text
-	print("")
-	print("UPDATE DOWNLOAD set PREPARED_ID = '" + prepared_id + "', STATUS = 'RESTORING' WHERE ID = " + download_id)
-
-
+	download_ids = input("Enter one or more space separated download id(s): ")
+	for download_id in download_ids.split():
+		requests.post(
+			f"{topcat_url}/admin/download/{download_id}/prepare",
+			params={
+				"facilityName": facility_name,
+				"sessionId": session_id,
+			},
+			verify=verifySsl,
+		)
 
 
 def expire_download():
@@ -293,7 +271,7 @@ while True:
 	print("What do you want to do?")
 	print(" * 1: Show download.")
 	print(" * 2: Get a list of all the file locations for a download.")
-	print(" * 3: Create preparedId for a download and generate update SQL.")
+	print(" * 3: Prepare download(s).")
 	print(" * 4: Set a download status to 'EXPIRED'.")
 	print(" * 5: Expire all pending downloads.")
 	print(" * 6: Enable or disable download types.")
