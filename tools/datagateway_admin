@@ -150,7 +150,7 @@ def list_file_locations():
 
 
 def prepare_download():
-	download_ids = input("Enter download id(s): ")
+	download_ids = input("Enter one or more space separated download id(s): ")
 	for download_id in download_ids.split():
 		requests.post(
 			f"{topcat_url}/admin/download/{download_id}/prepare",
@@ -271,7 +271,7 @@ while True:
 	print("What do you want to do?")
 	print(" * 1: Show download.")
 	print(" * 2: Get a list of all the file locations for a download.")
-	print(" * 3: Prepare download.")
+	print(" * 3: Prepare download(s).")
 	print(" * 4: Set a download status to 'EXPIRED'.")
 	print(" * 5: Expire all pending downloads.")
 	print(" * 6: Enable or disable download types.")
