@@ -754,6 +754,7 @@ public class StatusCheckTest {
 	@Test
 	@Transactional
 	public void testStartQueuedDownloadsNegative() throws Exception {
+		System.out.println("DEBUG testStartQueuedDownloadsNegative");
 		Long downloadId1 = null;
 		Long downloadId2 = null;
 		try {
@@ -770,10 +771,10 @@ public class StatusCheckTest {
 			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
 			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
 
-			assertEquals(DownloadStatus.PREPARING, postDownload1.getStatus());
-			assertNull(postDownload1.getPreparedId());
-			assertEquals(DownloadStatus.PREPARING, postDownload2.getStatus());
-			assertNull(postDownload2.getPreparedId());
+			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
+			assertNotNull(postDownload1.getPreparedId());
+			assertEquals(DownloadStatus.RESTORING, postDownload2.getStatus());
+			assertNotNull(postDownload2.getPreparedId());
 		} finally {
 			// clean up
 			TestHelpers.deleteDummyDownload(downloadId1, downloadRepository);
@@ -808,6 +809,7 @@ public class StatusCheckTest {
 	@Test
 	@Transactional
 	public void testStartQueuedDownloadsNonZero() throws Exception {
+		System.out.println("DEBUG testStartQueuedDownloadsNonZero");
 		Long downloadId1 = null;
 		Long downloadId2 = null;
 		try {
@@ -824,8 +826,8 @@ public class StatusCheckTest {
 			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
 			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
 
-			assertEquals(DownloadStatus.PREPARING, postDownload1.getStatus());
-			assertNull(postDownload1.getPreparedId());
+			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
+			assertNotNull(postDownload1.getPreparedId());
 			assertEquals(DownloadStatus.PAUSED, postDownload2.getStatus());
 			assertNull(postDownload2.getPreparedId());
 		} finally {
