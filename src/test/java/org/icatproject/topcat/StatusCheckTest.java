@@ -130,6 +130,11 @@ public class StatusCheckTest {
 	@Inject
 	private StatusCheck statusCheck;
 
+	@BeforeClass
+	public static void beforeAll() {
+		TestHelpers.installTrustManager();
+	}
+
 	@Test
 	@Transactional
 	public void testSimpleDownload() throws Exception {
