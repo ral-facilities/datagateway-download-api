@@ -835,8 +835,10 @@ public class UserResource {
 		if (isTwoLevel) {
 			download.setStatus(downloadStatus);
 		} else {
+			logger.info("Requesting prepareData for Download " + download.getFileName() + " " + download.getId());
 			String preparedId = idsClient.prepareData(download.getSessionId(), download.getInvestigationIds(),
 					download.getDatasetIds(), download.getDatafileIds());
+			logger.info("Received preparedId " + preparedId + " for Download " + download.getFileName() + " " + download.getId());
 			download.setPreparedId(preparedId);
 			download.setStatus(DownloadStatus.COMPLETE);
 		}
