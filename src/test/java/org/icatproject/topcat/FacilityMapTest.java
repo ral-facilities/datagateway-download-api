@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.icatproject.topcat.exceptions.InternalException;
 import org.junit.*;
+import org.junit.function.ThrowingRunnable;
 
 public class FacilityMapTest {
 	
@@ -23,6 +24,10 @@ public class FacilityMapTest {
 		
 		public void setMockProperty( String propName, String value ) {
 			props.put(propName, value);
+		}
+		
+		public String getProperty( String propertyName ) {
+			return props.get(propertyName);
 		}
 		
 		public String getProperty( String propertyName, String defaultValue ) {
@@ -113,4 +118,42 @@ public class FacilityMapTest {
 		}
 	}
 
+	@Test
+	public void testGetIcatUrl() throws InternalException{
+		String facilityList = "Fac1";
+		String icatUrl = "DummyIcatUrl";
+		String idsUrl = "DummyIdsUrl";
+		String defaultFacilityName = "Fac1";
+
+		MockProperties props = new MockProperties();
+
+		props.setMockProperty("facility.list", facilityList);
+		props.setMockProperty("facility.Fac1.icatUrl", icatUrl);
+		props.setMockProperty("facility.Fac1.idsUrl", idsUrl);
+		props.setMockProperty("defaultFacilityName", defaultFacilityName);
+
+		FacilityMap facilityMap = new FacilityMap(props);
+
+		assertEquals(icatUrl, facilityMap.getIcatUrl(null));
+	}
+
+	@Test
+	public void testGetIcatUrlFailure() throws InternalException{
+		String facilityList = "Fac1, Fac2";
+		String icatUrl = "DummyIcatUrl";
+		String idsUrl = "DummyIdsUrl";
+
+		MockProperties props = new MockProperties();
+
+		props.setMockProperty("facility.list", facilityList);
+		props.setMockProperty("facility.Fac1.icatUrl", icatUrl);
+		props.setMockProperty("facility.Fac1.idsUrl", idsUrl);
+		props.setMockProperty("facility.Fac2.icatUrl", icatUrl);
+		props.setMockProperty("facility.Fac2.idsUrl", idsUrl);
+
+		FacilityMap facilityMap = new FacilityMap(props);
+
+		ThrowingRunnable runnable = () -> {facilityMap.getIcatUrl(null);};
+		assertThrows(InternalException.class, runnable);
+	}
 }
