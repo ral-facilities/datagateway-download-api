@@ -300,19 +300,28 @@ def queue_files():
 	transport = input("Enter transport mechanism: ")
 	email = input("Enter email to notify upon completion: ")
 	local_file = input("Enter path to local file containing newline delimited file locations: ")
-	with open(local_file) as f:
-		files = [l.strip() for l in f.readlines()]
-
+	i = 1
+	files = []
 	data = {
 		"facilityName": facility_name,
 		"sessionId": session_id,
 		"transport": transport,
 		"email": email,
-		"files": files,
 	}
 	url = topcat_url + "/user/queue/files"
-	print(requests.post(url=url, data=data, verify=verifySsl).text)
-
+	with open(local_file) as f:
+		for line in f.readlines():
+			files.append(line.strip())
+			if len(files) >= 10000:
+				data["files"] = files
+				data["fileName"] = f"{facility_name}_files_part_{i}"
+				print(requests.post(url=url, data=data, verify=verifySsl).text)
+				i += 1
+				files = []
+	
+	if files:
+		data["files"] = files
+		print(requests.post(url=url, data=data, verify=verifySsl).text)
 
 
 def get_all_queued_downloads():

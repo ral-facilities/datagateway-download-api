@@ -753,8 +753,8 @@ public class StatusCheckTest {
 
 	@Test
 	@Transactional
-	public void testStartQueuedDownloadsNegative() throws Exception {
-		System.out.println("DEBUG testStartQueuedDownloadsNegative");
+	public void testStartQueuedDownloadNegative() throws Exception {
+		System.out.println("DEBUG testStartQueuedDownloadNegative");
 		Long downloadId1 = null;
 		Long downloadId2 = null;
 		try {
@@ -766,62 +766,7 @@ public class StatusCheckTest {
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
-			statusCheck.startQueuedDownloads(-1);
-
-			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
-			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
-
-			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
-			assertNotNull(postDownload1.getPreparedId());
-			assertEquals(DownloadStatus.RESTORING, postDownload2.getStatus());
-			assertNotNull(postDownload2.getPreparedId());
-		} finally {
-			// clean up
-			TestHelpers.deleteDummyDownload(downloadId1, downloadRepository);
-			TestHelpers.deleteDummyDownload(downloadId2, downloadRepository);
-		}
-	}
-
-	@Test
-	@Transactional
-	public void testStartQueuedDownloadsZero() throws Exception {
-		Long downloadId = null;
-		try {
-			String transport = "http";
-			Download dummyDownload = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.QUEUED, false, downloadRepository);
-			downloadId = dummyDownload.getId();
-
-			statusCheck.startQueuedDownloads(0);
-
-			// Download status should still be QUEUED, as we unqueued a max of 0 downloads
-
-			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
-
-			assertEquals(DownloadStatus.QUEUED, postDownload.getStatus());
-			assertNull(postDownload.getPreparedId());
-		} finally {
-			// clean up
-			TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
-		}
-	}
-
-	@Test
-	@Transactional
-	public void testStartQueuedDownloadsNonZero() throws Exception {
-		System.out.println("DEBUG testStartQueuedDownloadsNonZero");
-		Long downloadId1 = null;
-		Long downloadId2 = null;
-		try {
-			String transport = "http";
-			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.QUEUED, false, downloadRepository);
-			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.QUEUED, false, downloadRepository);
-			downloadId1 = dummyDownload1.getId();
-			downloadId2 = dummyDownload2.getId();
-
-			statusCheck.startQueuedDownloads(1);
+			statusCheck.startQueuedDownload(-1);
 
 			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
 			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
@@ -839,7 +784,62 @@ public class StatusCheckTest {
 
 	@Test
 	@Transactional
-	public void testStartQueuedDownloadsNonZeroRestoringDownload() throws Exception {
+	public void testStartQueuedDownloadZero() throws Exception {
+		Long downloadId = null;
+		try {
+			String transport = "http";
+			Download dummyDownload = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
+					DownloadStatus.QUEUED, false, downloadRepository);
+			downloadId = dummyDownload.getId();
+
+			statusCheck.startQueuedDownload(0);
+
+			// Download status should still be QUEUED, as we unqueued a max of 0 downloads
+
+			Download postDownload = TestHelpers.getDummyDownload(downloadId, downloadRepository);
+
+			assertEquals(DownloadStatus.QUEUED, postDownload.getStatus());
+			assertNull(postDownload.getPreparedId());
+		} finally {
+			// clean up
+			TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
+		}
+	}
+
+	@Test
+	@Transactional
+	public void testStartQueuedDownloadNonZero() throws Exception {
+		System.out.println("DEBUG testStartQueuedDownloadNonZero");
+		Long downloadId1 = null;
+		Long downloadId2 = null;
+		try {
+			String transport = "http";
+			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
+					DownloadStatus.QUEUED, false, downloadRepository);
+			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
+					DownloadStatus.QUEUED, false, downloadRepository);
+			downloadId1 = dummyDownload1.getId();
+			downloadId2 = dummyDownload2.getId();
+
+			statusCheck.startQueuedDownload(1);
+
+			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
+			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
+
+			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
+			assertNotNull(postDownload1.getPreparedId());
+			assertEquals(DownloadStatus.QUEUED, postDownload2.getStatus());
+			assertNull(postDownload2.getPreparedId());
+		} finally {
+			// clean up
+			TestHelpers.deleteDummyDownload(downloadId1, downloadRepository);
+			TestHelpers.deleteDummyDownload(downloadId2, downloadRepository);
+		}
+	}
+
+	@Test
+	@Transactional
+	public void testStartQueuedDownloadNonZeroRestoringDownload() throws Exception {
 		Long downloadId1 = null;
 		Long downloadId2 = null;
 		try {
@@ -851,7 +851,7 @@ public class StatusCheckTest {
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
-			statusCheck.startQueuedDownloads(1);
+			statusCheck.startQueuedDownload(1);
 
 			// Should not schedule the second Download, as we already have 1 which is
 			// RESTORING
