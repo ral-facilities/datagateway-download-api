@@ -113,7 +113,7 @@ public class FacilityMap {
 		url = properties.getProperty( "facility." + facility + ".downloadType." + downloadType, "" );
 		if( url.length() == 0 ){
 			// No such property, so fall back to the facility idsUrl
-			logger.info("FacilityMap.getDownloadUrl: no specific property for facility '" 
+			logger.trace("FacilityMap.getDownloadUrl: no specific property for facility '" 
 					+ facility + "' and download type '" + downloadType + "'; returning idsUrl instead" );
 			url = this.getIdsUrl(facility);
 		}
