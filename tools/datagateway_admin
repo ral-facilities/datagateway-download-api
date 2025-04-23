@@ -157,14 +157,15 @@ def list_file_locations():
 
 def prepare_download():
 	for download_id in input_download_ids():
-		requests.post(
+		response = requests.put(
 			f"{topcat_url}/admin/download/{download_id}/prepare",
-			params={
+			data={
 				"facilityName": facility_name,
 				"sessionId": session_id,
 			},
 			verify=verifySsl,
 		)
+		print(response.status_code, response.text)
 
 
 def expire_download():
@@ -173,7 +174,7 @@ def expire_download():
 
 
 def _expire_download(download_id):
-	requests.put(
+	response = requests.put(
 		topcat_url + "/admin/download/" + download_id +  "/status",
 		data={
 			"facilityName": facility_name,
@@ -182,6 +183,7 @@ def _expire_download(download_id):
 		},
 		verify=verifySsl,
 	)
+	print(response.status_code, response.text)
 
 
 def expire_all_pending_downloads():
@@ -194,12 +196,8 @@ def expire_all_pending_downloads():
 		"sessionId": session_id,
 		"queryOffset": query
 	}, verify=verifySsl).text)
-	for download in  downloads:
-		requests.put(topcat_url + "/admin/download/" + str(download["id"]) +  "/status", data={
-			"facilityName": facility_name,
-			"sessionId": session_id,
-			"value": "EXPIRED"
-		}, verify=verifySsl)
+	for download in downloads:
+		_expire_download(download_id=download["id"])
 
 def manage_download_types():
 	download_types = list(settingsJson["accessMethods"])
@@ -300,19 +298,28 @@ def queue_files():
 	transport = input("Enter transport mechanism: ")
 	email = input("Enter email to notify upon completion: ")
 	local_file = input("Enter path to local file containing newline delimited file locations: ")
-	with open(local_file) as f:
-		files = [l.strip() for l in f.readlines()]
-
+	i = 1
+	files = []
 	data = {
 		"facilityName": facility_name,
 		"sessionId": session_id,
 		"transport": transport,
 		"email": email,
-		"files": files,
 	}
 	url = topcat_url + "/user/queue/files"
-	print(requests.post(url=url, data=data, verify=verifySsl).text)
-
+	with open(local_file) as f:
+		for line in f.readlines():
+			files.append(line.strip())
+			if len(files) >= 10000:
+				data["files"] = files
+				data["fileName"] = f"{facility_name}_files_part_{i}"
+				print(requests.post(url=url, data=data, verify=verifySsl).text)
+				i += 1
+				files = []
+	
+	if files:
+		data["files"] = files
+		print(requests.post(url=url, data=data, verify=verifySsl).text)
 
 
 def get_all_queued_downloads():
@@ -328,14 +335,15 @@ def get_all_queued_downloads():
 	return requests.get(topcat_url + "/admin/downloads", params=params, verify=verifySsl).text
 
 
-def prepare_download(download_id):
+def start_download(download_id):
 	data = {
 		"facilityName": facility_name,
 		"sessionId": session_id,
 		"value": "PREPARING"
 	}
 	url = topcat_url + "/admin/download/" + download_id +  "/status"
-	requests.put(url=url, data=data, verify=verifySsl)
+	response = requests.put(url=url, data=data, verify=verifySsl)
+	print(response.status_code, response.text)
 
 
 def show_all_queued_downloads():
@@ -344,14 +352,14 @@ def show_all_queued_downloads():
 
 def start_queued_download():
 	for download_id in input_download_ids():
-		prepare_download(download_id=download_id)
+		start_download(download_id=download_id)
 
 
 def start_queued_downloads():
 	text = get_all_queued_downloads()
 	downloads = json.loads(text)
-	for download in  downloads:
-		prepare_download(str(download["id"]))
+	for download in downloads:
+		start_download(str(download["id"]))
 
 
 def requeue_download():
@@ -362,7 +370,8 @@ def requeue_download():
 			"value": "QUEUED"
 		}
 		url = topcat_url + "/admin/download/" + download_id +  "/status"
-		requests.put(url=url, data=data, verify=verifySsl)
+		response = requests.put(url=url, data=data, verify=verifySsl)
+		print(response.status_code, response.text)
 
 
 def expire_all_queued_downloads():

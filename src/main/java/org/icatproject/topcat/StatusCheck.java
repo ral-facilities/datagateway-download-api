@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.ejb.EJB;
+import jakarta.ejb.Lock;
+import jakarta.ejb.LockType;
 import jakarta.ejb.Schedule;
 import jakarta.ejb.Singleton;
 import jakarta.json.JsonObject;
@@ -51,7 +53,6 @@ public class StatusCheck {
   private static final Logger logger = LoggerFactory.getLogger(StatusCheck.class);
   private Map<Long, Date> lastChecks = new HashMap<Long, Date>();
   private AtomicBoolean busy = new AtomicBoolean(false);
-  private AtomicBoolean busyQueue = new AtomicBoolean(false);
 
   @PersistenceContext(unitName="topcat")
   EntityManager em;
@@ -61,10 +62,16 @@ public class StatusCheck {
 
   @Resource(name = "mail/topcat")
   private Session mailSession;
-  
+
+  /**
+   * poll thread will be WRITE locked, which is the default behaviour for Singletons
+   * All write operations should go in this function, we do not want other WRITE locked
+   * threads (e.g. for queuing) to block traditional user cart submissions.
+   */
+  @Lock(LockType.WRITE)
   @Schedule(hour = "*", minute = "*", second = "*")
   private void poll() {
-	  
+
     // Observation: glassfish may already prevent multiple executions, and may even
     // count the attempt as an error, so it is possible that the use of a semaphore
     // here is redundant.
@@ -81,41 +88,18 @@ public class StatusCheck {
       // For testing, separate out the poll body into its own method
       // And allow test configurations to disable scheduled status checks
       if (!Boolean.valueOf(properties.getProperty("test.disableDownloadStatusChecks", "false"))) {
-        updateStatuses(pollDelay, pollIntervalWait, null);
+        boolean downloadsUpdated = updateStatuses(pollDelay, pollIntervalWait, null);
+        if (!downloadsUpdated) {
+          // Only process a Download from the queue if there was no work to do for Cart based Downloads
+          int maxActiveDownloads = Integer.valueOf(properties.getProperty("queue.maxActiveDownloads", "1"));
+          startQueuedDownload(maxActiveDownloads);
+        }
       }
 
     } catch (Exception e) {
       logger.error(e.getMessage());
     } finally {
       busy.set(false);
-    }
-  }
-  
-  @Schedule(hour = "*", minute = "*/10", second = "0")
-  private void pollQueue() {
-	  
-    // Observation: glassfish may already prevent multiple executions, and may even
-    // count the attempt as an error, so it is possible that the use of a semaphore
-    // here is redundant.
-	  
-    if (!busyQueue.compareAndSet(false, true)) {
-      return;
-    }
-
-    try {
-      Properties properties = Properties.getInstance();
-      int maxActiveDownloads = Integer.valueOf(properties.getProperty("queue.maxActiveDownloads", "1"));
-
-      // For testing, separate out the poll body into its own method
-      // And allow test configurations to disable scheduled status checks
-      if (!Boolean.valueOf(properties.getProperty("test.disableDownloadStatusChecks", "false"))) {
-        startQueuedDownloads(maxActiveDownloads);
-      }
-
-    } catch (Exception e) {
-      logger.error(e.getMessage());
-    } finally {
-      busyQueue.set(false);
     }
   }
   
@@ -126,13 +110,14 @@ public class StatusCheck {
    *                          preparation/check
    * @param pollIntervalWait  minimum time between checks
    * @param injectedIdsClient optional (possibly mock) IdsClient
+   * @return Whether any Downloads to update were found and prepared
    * @throws Exception
    */
-  public void updateStatuses(int pollDelay, int pollIntervalWait, IdsClient injectedIdsClient) throws Exception {
+  public boolean updateStatuses(int pollDelay, int pollIntervalWait, IdsClient injectedIdsClient) throws Exception {
 	  
     // This method is intended for testing, but we are forced to make it public
     // rather than protected.
-
+    boolean statusesUpdated = false;
     String selectString = "select download from Download download where download.isDeleted != true";
     String notExpiredCondition = "download.status != org.icatproject.topcat.domain.DownloadStatus.EXPIRED";
     String preparingCondition = "download.status = org.icatproject.topcat.domain.DownloadStatus.PREPARING";
@@ -144,6 +129,10 @@ public class StatusCheck {
     TypedQuery<Download> query = em.createQuery(queryString, Download.class);
     List<Download> downloads = query.getResultList();
 
+    if (downloads.size() == 0) {
+      return statusesUpdated;
+    }
+
     for (Download download : downloads) {
       Date lastCheck = lastChecks.get(download.getId());
       Date now = new Date();
@@ -154,10 +143,12 @@ public class StatusCheck {
         // a delay. See issue #462.
         if (lastCheck == null) {
       	  prepareDownload(download, injectedIdsClient);
+          statusesUpdated = true;
         } else {
           long lastCheckSecondsAgo = (now.getTime() - lastCheck.getTime()) / 1000;
           if (lastCheckSecondsAgo >= pollIntervalWait) {
          	  prepareDownload(download, injectedIdsClient);
+            statusesUpdated = true;
           }
         }
       } else if (download.getPreparedId() != null && createdSecondsAgo >= pollDelay) {
@@ -170,7 +161,9 @@ public class StatusCheck {
           }
         }
       }
-    }	  
+    }
+
+    return statusesUpdated;
   }
 
   private void performCheck(Download download, IdsClient injectedIdsClient) {
@@ -371,7 +364,7 @@ public class StatusCheck {
   }
 
   /**
-   * Prepares Downloads which are QUEUED up to the maxActiveDownloads limit.
+   * Prepares up to one Download which is QUEUED, up to the maxActiveDownloads limit.
    * Downloads will be prepared in order of priority, with all Downloads from
    * Users with a value of 1 being prepared first, then 2 and so on.
    * 
@@ -379,7 +372,7 @@ public class StatusCheck {
    *                           RESTORING status
    * @throws Exception
    */
-  public void startQueuedDownloads(int maxActiveDownloads) throws Exception {
+  public void startQueuedDownload(int maxActiveDownloads) throws Exception {
     if (maxActiveDownloads == 0) {
       logger.trace("Preparing of queued jobs disabled by config, skipping");
       return;
@@ -408,17 +401,20 @@ public class StatusCheck {
     queuedQueryString += " order by download.createdAt";
     TypedQuery<Download> queuedDownloadsQuery = em.createQuery(queuedQueryString, Download.class);
     List<Download> queuedDownloads = queuedDownloadsQuery.getResultList();
+    int queueSize = queuedDownloads.size();
+    if (queueSize == 0) {
+      return;
+    }
 
     Map<String, String> sessionIds = new HashMap<>();
     if (maxActiveDownloads <= 0) {
       // No limits on how many to submit
-      logger.trace("Preparing {} queued downloads", queuedDownloads.size());
-      for (Download queuedDownload : queuedDownloads) {
-        queuedDownload.setStatus(DownloadStatus.PREPARING);
-        prepareDownload(queuedDownload, null, getQueueSessionId(sessionIds, queuedDownload.getFacilityName()));
-      }
+      logger.info("Preparing 1 out of {} queued downloads", queueSize);
+      Download queuedDownload = queuedDownloads.get(0);
+      queuedDownload.setStatus(DownloadStatus.PREPARING);
+      prepareDownload(queuedDownload, null, getQueueSessionId(sessionIds, queuedDownload.getFacilityName()));
     } else {
-      logger.trace("Preparing up to {} queued downloads", availableDownloads);
+      logger.info("Preparing 1 out of {} queued downloads as {} spaces available", queueSize, availableDownloads);
       HashMap<Integer, List<Download>> mapping = new HashMap<>();
       for (Download queuedDownload : queuedDownloads) {
         String sessionId = getQueueSessionId(sessionIds, queuedDownload.getFacilityName());
@@ -429,33 +425,26 @@ public class StatusCheck {
           // Highest priority, prepare now
           queuedDownload.setStatus(DownloadStatus.PREPARING);
           prepareDownload(queuedDownload, null, sessionId);
-          availableDownloads -= 1;
-          if (availableDownloads <= 0) {
-            return;
-          }
+          return;
         } else {
           // Lower priority, add to mapping
           mapping.putIfAbsent(priority, new ArrayList<>());
           mapping.get(priority).add(queuedDownload);
         }
       }
+
+      // Get the highest priority encountered
       List<Integer> keyList = new ArrayList<>();
       for (Object key : mapping.keySet().toArray()) {
         keyList.add((Integer) key);
       }
-      Collections.sort(keyList);
-      for (int key : keyList) {
-        // Prepare from mapping in priority order
-        List<Download> downloadList = mapping.get(key);
-        for (Download download : downloadList) {
-          download.setStatus(DownloadStatus.PREPARING);
-          prepareDownload(download, null, getQueueSessionId(sessionIds, download.getFacilityName()));
-          availableDownloads -= 1;
-          if (availableDownloads <= 0) {
-            return;
-          }
-        }
-      }
+      int priority = Collections.min(keyList);
+
+      // Prepare the first Download at this priority level
+      List<Download> downloadList = mapping.get(priority);
+      Download download = downloadList.get(0);
+      download.setStatus(DownloadStatus.PREPARING);
+      prepareDownload(download, null, getQueueSessionId(sessionIds, download.getFacilityName()));
     }
   }
 
