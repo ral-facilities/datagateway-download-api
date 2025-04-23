@@ -409,12 +409,12 @@ public class StatusCheck {
     Map<String, String> sessionIds = new HashMap<>();
     if (maxActiveDownloads <= 0) {
       // No limits on how many to submit
-      logger.trace("Preparing 1 out of {} queued downloads", queueSize);
+      logger.info("Preparing 1 out of {} queued downloads", queueSize);
       Download queuedDownload = queuedDownloads.get(0);
       queuedDownload.setStatus(DownloadStatus.PREPARING);
       prepareDownload(queuedDownload, null, getQueueSessionId(sessionIds, queuedDownload.getFacilityName()));
     } else {
-      logger.trace("Preparing 1 out of {} queued downloads as {} spaces available", queueSize, availableDownloads);
+      logger.info("Preparing 1 out of {} queued downloads as {} spaces available", queueSize, availableDownloads);
       HashMap<Integer, List<Download>> mapping = new HashMap<>();
       for (Download queuedDownload : queuedDownloads) {
         String sessionId = getQueueSessionId(sessionIds, queuedDownload.getFacilityName());
