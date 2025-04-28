@@ -17,6 +17,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.icatproject.topcat.domain.*;
 
 import jakarta.json.*;
+import jakarta.json.JsonValue.ValueType;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -246,7 +247,12 @@ public class IcatClient {
 	public long getDatasetFileSize(long datasetId) throws TopcatException {
 			String query = "SELECT SUM(datafile.fileSize) FROM Datafile datafile WHERE datafile.dataset.id = " + datasetId;
 		JsonArray jsonArray = submitQuery(query);
-		return jsonArray.getJsonNumber(0).longValueExact();
+		if (jsonArray.get(0).getValueType().equals(ValueType.NUMBER)) {
+			return jsonArray.getJsonNumber(0).longValueExact();
+		} else {
+			// SUM will be null if there are no matching Datafiles, so return 0
+			return 0L;
+		}
 	}
 
 	/**

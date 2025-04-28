@@ -283,11 +283,10 @@ public class UserResourceTest {
 		System.out.println("DEBUG testQueueVisitId");
 		List<Long> downloadIds = new ArrayList<>();
 		try {
-			String facilityName = "LILS";
 			String transport = "http";
 			String email = "";
 			String visitId = "Proposal 0 - 0 0";
-			Response response = userResource.queueVisitId(facilityName, sessionId, transport, null, email, visitId);
+			Response response = userResource.queueVisitId(null, sessionId, transport, null, email, visitId);
 			assertEquals(200, response.getStatus());
 	
 			JsonArray downloadIdsArray = Utils.parseJsonArray(response.getEntity().toString());
@@ -351,7 +350,6 @@ public class UserResourceTest {
 		System.out.println("DEBUG testQueueFiles");
 		Long downloadId = null;
 		try {
-			String facilityName = "LILS";
 			String transport = "http";
 			String email = "";
 			String file = "abcdefghijklmnopqrstuvwxyz";
@@ -362,7 +360,7 @@ public class UserResourceTest {
 			for (JsonObject datafile : datafiles) {
 				files.add(datafile.getString("location"));
 			}
-			Response response = userResource.queueFiles(facilityName, sessionId, transport, null, email, files);
+			Response response = userResource.queueFiles(null, sessionId, transport, null, email, files);
 			assertEquals(200, response.getStatus());
 			JsonObject responseObject = Utils.parseJsonObject(response.getEntity().toString());
 			downloadId = responseObject.getJsonNumber("downloadId").longValueExact();

@@ -71,7 +71,7 @@ public class FacilityMap {
 		}
 	}
 
-	private String validateFacilityName(String facility) throws InternalException {
+	public String validateFacilityName(String facility) throws InternalException {
 		if (facility == null) {
 			String defaultFacilityName = properties.getProperty("defaultFacilityName");
 			if (defaultFacilityName == null) {

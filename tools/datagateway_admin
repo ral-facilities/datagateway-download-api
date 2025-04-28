@@ -114,7 +114,7 @@ def show_download():
 		print(requests.get(topcat_url + "/admin/downloads", params={
 			"facilityName": facility_name,
 			"sessionId": session_id,
-			"queryOffset": "where download.id = " + download_id
+			"queryOffset": f"where download.id = {download_id}"
 		}, verify=verifySsl).text)
 
 
@@ -124,7 +124,7 @@ def list_file_locations():
 		download = json.loads(requests.get(topcat_url + "/admin/downloads", params={
 			"facilityName": facility_name,
 			"sessionId": session_id,
-			"queryOffset": "where download.id = " + download_id
+			"queryOffset": f"where download.id = {download_id}"
 		}, verify=verifySsl).text)[0]
 		download_items = download["downloadItems"]
 		datafile_locations = []
@@ -175,7 +175,7 @@ def expire_download():
 
 def _expire_download(download_id):
 	response = requests.put(
-		topcat_url + "/admin/download/" + download_id +  "/status",
+		f"{topcat_url}/admin/download/{download_id}/status",
 		data={
 			"facilityName": facility_name,
 			"sessionId": session_id,
@@ -341,7 +341,7 @@ def start_download(download_id):
 		"sessionId": session_id,
 		"value": "PREPARING"
 	}
-	url = topcat_url + "/admin/download/" + download_id +  "/status"
+	url = f"{topcat_url}/admin/download/{download_id}/status"
 	response = requests.put(url=url, data=data, verify=verifySsl)
 	print(response.status_code, response.text)
 
@@ -369,7 +369,7 @@ def requeue_download():
 			"sessionId": session_id,
 			"value": "QUEUED"
 		}
-		url = topcat_url + "/admin/download/" + download_id +  "/status"
+		url = f"{topcat_url}/admin/download/{download_id}/status"
 		response = requests.put(url=url, data=data, verify=verifySsl)
 		print(response.status_code, response.text)
 

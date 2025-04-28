@@ -7,6 +7,7 @@ import static org.junit.Assert.*;
 import org.junit.*;
 
 import jakarta.json.*;
+import jakarta.json.JsonValue.ValueType;
 import jakarta.ejb.EJB;
 
 import org.icatproject.topcat.httpclient.HttpClient;
@@ -241,10 +242,28 @@ public class IcatClientTest {
 	}
 
 	@Test
+	public void testGetDatasets() throws TopcatException {
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		JsonArray datasets = icatClient.getDatasets("Proposal 0 - 0 0");
+		for (JsonValue dataset : datasets) {
+			JsonArray datasetArray = dataset.asJsonArray();
+			assertEquals(datasetArray.get(0).getValueType(), ValueType.NUMBER);
+			assertEquals(datasetArray.get(1).getValueType(), ValueType.NUMBER);
+			assertEquals(datasetArray.get(2).getValueType(), ValueType.NUMBER);
+		}
+	}
+
+	@Test
 	public void testGetDatasetFileCount() throws TopcatException {
 		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
 		long datasetId = icatClient.getEntity("Dataset").getJsonNumber("id").longValueExact();
-		assertNotEquals(0, icatClient.getDatasetFileCount(datasetId));
+		assertNotEquals(0L, icatClient.getDatasetFileCount(datasetId));
+	}
+
+	@Test
+	public void testGetDatasetFileCountNotFound() throws TopcatException {
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		assertEquals(0L, icatClient.getDatasetFileCount(-1L));
 	}
 
 	@Test
@@ -252,6 +271,12 @@ public class IcatClientTest {
 		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
 		long datasetId = icatClient.getEntity("Dataset").getJsonNumber("id").longValueExact();
 		assertNotEquals(0, icatClient.getDatasetFileSize(datasetId));
+	}
+
+	@Test
+	public void testGetDatasetFileSizeNotFound() throws TopcatException {
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		assertEquals(0, icatClient.getDatasetFileSize(-1L));
 	}
 
 	/*
