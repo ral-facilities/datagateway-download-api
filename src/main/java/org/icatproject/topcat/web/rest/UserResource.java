@@ -881,6 +881,7 @@ public class UserResource {
 		logger.info("queueVisitId called for {}", visitId);
 		validateTransport(transport);
 
+		facilityName = validateFacilityName(facilityName);
 		String icatUrl = getIcatUrl(facilityName);
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 		String transportUrl = getDownloadUrl(facilityName, transport);
@@ -1004,6 +1005,7 @@ public class UserResource {
 		}
 		logger.info("queueFiles called for {} files", files.size());
 		validateTransport(transport);
+		facilityName = validateFacilityName(facilityName);
 		if (fileName == null) {
 			fileName = facilityName + "_files";
 		}
@@ -1177,6 +1179,14 @@ public class UserResource {
 
 	private Response emptyCart(String facilityName, String userName) {
 		return emptyCart(facilityName, userName, null);
+	}
+
+	private String validateFacilityName(String facilityName) throws BadRequestException {
+		try {
+			return FacilityMap.getInstance().validateFacilityName(facilityName);
+		} catch (InternalException ie){
+			throw new BadRequestException( ie.getMessage() );
+		}
 	}
 	
 	private String getIcatUrl( String facilityName ) throws BadRequestException{
