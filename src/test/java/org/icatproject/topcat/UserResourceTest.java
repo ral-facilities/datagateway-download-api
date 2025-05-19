@@ -12,6 +12,7 @@ import org.jboss.shrinkwrap.api.spec.JavaArchive;
 
 import static org.junit.Assert.*;
 import org.junit.*;
+import org.junit.function.ThrowingRunnable;
 import org.junit.runner.RunWith;
 import jakarta.inject.Inject;
 
@@ -21,6 +22,12 @@ import jakarta.ejb.EJB;
 
 import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.domain.*;
+import org.icatproject.topcat.exceptions.BadRequestException;
+import org.icatproject.topcat.exceptions.ForbiddenException;
+import org.icatproject.topcat.exceptions.NotFoundException;
+import org.icatproject.topcat.exceptions.TopcatException;
+
+import java.net.MalformedURLException;
 import java.net.URLEncoder;
 
 import org.icatproject.topcat.repository.CacheRepository;
@@ -30,6 +37,7 @@ import org.icatproject.topcat.repository.DownloadTypeRepository;
 import org.icatproject.topcat.web.rest.UserResource;
 
 import java.sql.*;
+import java.text.ParseException;
 
 @RunWith(Arquillian.class)
 public class UserResourceTest {
@@ -76,12 +84,23 @@ public class UserResourceTest {
 	@Before
 	public void setup() throws Exception {
 		HttpClient httpClient = new HttpClient("https://localhost:8181/icat");
-		String data = "json=" + URLEncoder.encode(
+		String loginData = "json=" + URLEncoder.encode(
 				"{\"plugin\":\"simple\", \"credentials\":[{\"username\":\"root\"}, {\"password\":\"pw\"}]}", "UTF8");
-		String response = httpClient.post("session", new HashMap<String, String>(), data).toString();
+		String response = httpClient.post("session", new HashMap<String, String>(), loginData).toString();
 		sessionId = Utils.parseJsonObject(response).getString("sessionId");
 
 		connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/icatdb", "icatdbuser", "icatdbuserpw");
+	}
+
+	@Test
+	public void testLogin() throws Exception {
+		String loginResponseString = userResource.login(null, "root", "pw", null);
+		JsonObject loginResponseObject = Utils.parseJsonObject(loginResponseString);
+
+		assertEquals(loginResponseObject.toString(), 1, loginResponseObject.keySet().size());
+		assertTrue(loginResponseObject.containsKey("sessionId"));
+		// Will throw if not a UUID
+		UUID.fromString(loginResponseObject.getString("sessionId"));
 	}
 
 	@Test
@@ -156,9 +175,7 @@ public class UserResourceTest {
 		long entityId = dataset.getInt("id");
 
 		// Get the initial state of the downloads - may not be empty
-		// It appears queryOffset cannot be empty!
-		String queryOffset = "1 = 1";
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 
 		downloads = (List<Download>) response.getEntity();
@@ -188,7 +205,7 @@ public class UserResourceTest {
 		assertTrue(downloadId > 0);
 
 		// Now, there should be one download, whose downloadId matches
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 
 		// Doesn't parse as JSON, try a direct cast
@@ -223,13 +240,19 @@ public class UserResourceTest {
 		if (newDownload.getStatus().equals(DownloadStatus.valueOf(downloadStatus))) {
 			downloadStatus = "PAUSED";
 		}
-
+		// We cannot modify the status of a download without a prepared id
+		// Using downloadRepository will create a new Download with a different id,
+		// so remove the old one without the preparedId.
+		newDownload.setPreparedId("preparedId");
+		Download preparedDownload = downloadRepository.save(newDownload);
+		downloadRepository.removeDownload(downloadId);
+		downloadId = preparedDownload.getId();
 		response = userResource.setDownloadStatus(downloadId, facilityName, sessionId, downloadStatus);
 		assertEquals(200, response.getStatus());
 
 		// and test that the new status has been set
 
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 		downloads = (List<Download>) response.getEntity();
 
@@ -247,12 +270,202 @@ public class UserResourceTest {
 		// and check that it has worked (again, not bothering to check that nothing else
 		// has changed)
 
-		response = userResource.getDownloads(facilityName, sessionId, queryOffset);
+		response = userResource.getDownloads(facilityName, sessionId, null);
 		assertEquals(200, response.getStatus());
 		downloads = (List<Download>) response.getEntity();
 
 		newDownload = findDownload(downloads, downloadId);
 		assertTrue(newDownload.getIsDeleted());
+	}
+
+	@Test
+	public void testQueueVisitId() throws Exception {
+		System.out.println("DEBUG testQueueVisitId");
+		List<Long> downloadIds = new ArrayList<>();
+		try {
+			String transport = "http";
+			String email = "";
+			String visitId = "Proposal 0 - 0 0";
+			Response response = userResource.queueVisitId(null, sessionId, transport, null, email, visitId);
+			assertEquals(200, response.getStatus());
+	
+			JsonArray downloadIdsArray = Utils.parseJsonArray(response.getEntity().toString());
+			assertEquals(3, downloadIdsArray.size());
+			long part = 1;
+			for (JsonNumber downloadIdJson : downloadIdsArray.getValuesAs(JsonNumber.class)) {
+				long downloadId = downloadIdJson.longValueExact();
+				downloadIds.add(downloadId);
+			}
+			for (long downloadId : downloadIds) {
+				Download download = downloadRepository.getDownload(downloadId);
+				assertNull(download.getPreparedId());
+				assertEquals(DownloadStatus.QUEUED, download.getStatus());
+				assertEquals(0, download.getInvestigationIds().size());
+				assertEquals(1, download.getDatasetIds().size());
+				assertEquals(0, download.getDatafileIds().size());
+				assertEquals("LILS_Proposal 0 - 0 0_part_" + part + "_of_3", download.getFileName());
+				assertEquals(transport, download.getTransport());
+				assertEquals("simple/root", download.getUserName());
+				assertEquals("simple/root", download.getFullName());
+				assertEquals("", download.getEmail());
+				assertNotEquals(0L, download.getSize());
+				part += 1;
+			}
+		} finally {
+			for (long downloadId : downloadIds) {
+				downloadRepository.removeDownload(downloadId);
+			}
+		}
+	}
+
+	@Test
+	public void testQueueVisitIdBadRequest() throws Exception {
+		System.out.println("DEBUG testQueueVisitIdBadRequest");
+		String facilityName = "LILS";
+		String transport = "http";
+		String email = "";
+		ThrowingRunnable runnable = () -> userResource.queueVisitId(facilityName, sessionId, transport, null, email, null);
+		Throwable throwable = assertThrows(BadRequestException.class, runnable);
+		assertEquals("(400) : visitId must be provided", throwable.getMessage());
+
+		runnable = () -> userResource.queueVisitId(facilityName, sessionId, transport, null, email, "");
+		throwable = assertThrows(BadRequestException.class, runnable);
+		assertEquals("(400) : visitId must be provided", throwable.getMessage());
+	}
+
+	@Test
+	public void testQueueVisitIdNotFound() throws Exception {
+		System.out.println("DEBUG testQueueVisitIdBadRequest");
+		String facilityName = "LILS";
+		String transport = "http";
+		String email = "";
+		String visitId = "test";
+		ThrowingRunnable runnable = () -> userResource.queueVisitId(facilityName, sessionId, transport, null, email, visitId);
+		Throwable throwable = assertThrows(NotFoundException.class, runnable);
+		assertEquals("(404) : No Datasets found for " + visitId, throwable.getMessage());
+	}
+
+	@Test
+	public void testQueueFiles() throws Exception {
+		System.out.println("DEBUG testQueueFiles");
+		Long downloadId = null;
+		try {
+			String transport = "http";
+			String email = "";
+			String file = "abcdefghijklmnopqrstuvwxyz";
+			IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+			List<JsonObject> datafiles = icatClient.getEntities("datafile", 2L);
+			List<String> files = new ArrayList<>();
+			files.add(file);
+			for (JsonObject datafile : datafiles) {
+				files.add(datafile.getString("location"));
+			}
+			Response response = userResource.queueFiles(null, sessionId, transport, null, email, files);
+			assertEquals(200, response.getStatus());
+			JsonObject responseObject = Utils.parseJsonObject(response.getEntity().toString());
+			downloadId = responseObject.getJsonNumber("downloadId").longValueExact();
+			JsonArray missingArray = responseObject.getJsonArray("notFound");
+			assertEquals(1, missingArray.size());
+			assertEquals(file, missingArray.getString(0));
+			Download download = downloadRepository.getDownload(downloadId);
+			assertNull(download.getPreparedId());
+			assertEquals(DownloadStatus.QUEUED, download.getStatus());
+			assertEquals(0, download.getInvestigationIds().size());
+			assertEquals(0, download.getDatasetIds().size());
+			assertEquals(2, download.getDatafileIds().size());
+			assertEquals("LILS_files", download.getFileName());
+			assertEquals(transport, download.getTransport());
+			assertEquals("simple/root", download.getUserName());
+			assertEquals("simple/root", download.getFullName());
+			assertEquals("", download.getEmail());
+			assertNotEquals(0L, download.getSize());
+		} finally {
+			if (downloadId != null) {
+				downloadRepository.removeDownload(downloadId);
+			}
+		}
+	}
+
+	@Test
+	public void testQueueFilesBadRequestEmpty() throws Exception {
+		System.out.println("DEBUG testQueueFilesBadRequestEmpty");
+		String facilityName = "LILS";
+		String transport = "http";
+		String email = "";
+		ThrowingRunnable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, null);
+		Throwable throwable = assertThrows(BadRequestException.class, runnable);
+		assertEquals("(400) : At least one Datafile.location required", throwable.getMessage());
+
+		runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, new ArrayList<>());
+		throwable = assertThrows(BadRequestException.class, runnable);
+		assertEquals("(400) : At least one Datafile.location required", throwable.getMessage());
+	}
+
+	@Test
+	public void testQueueFilesBadRequestTooMany() throws Exception {
+		System.out.println("DEBUG testQueueFilesBadRequestTooMany");
+		String facilityName = "LILS";
+		String transport = "http";
+		String email = "";
+		List<String> files = List.of("1", "2", "3", "4");
+		ThrowingRunnable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, files);
+		Throwable throwable = assertThrows(BadRequestException.class, runnable);
+		assertEquals("(400) : Limit of 3 files exceeded", throwable.getMessage());
+	}
+
+	@Test
+	public void testQueueFilesNotFound() throws Exception {
+		System.out.println("DEBUG testQueueFilesNotFound");
+		String facilityName = "LILS";
+		String transport = "http";
+		String email = "";
+		ThrowingRunnable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, List.of("test"));
+		Throwable throwable = assertThrows(NotFoundException.class, runnable);
+		assertEquals("(404) : No Datafiles found", throwable.getMessage());
+	}
+
+	@Test
+	public void testQueueAllowed() throws Exception {
+		System.out.println("DEBUG testQueueAllowed");
+
+		String facilityName = "LILS";
+		Response response = userResource.queueAllowed(sessionId, facilityName);
+		assertEquals(200, response.getStatus());
+		assertEquals(true, response.getEntity());
+	}
+
+	@Test
+	public void testSetDownloadStatus() throws Exception {
+		Long downloadId = null;
+		try {
+			Download testDownload = new Download();
+			String facilityName = "LILS";
+			testDownload.setFacilityName(facilityName);
+			testDownload.setSessionId(sessionId);
+			testDownload.setStatus(DownloadStatus.QUEUED);
+			testDownload.setIsDeleted(false);
+			testDownload.setUserName("simple/root");
+			testDownload.setFileName("testFile.txt");
+			testDownload.setTransport("http");
+			downloadRepository.save(testDownload);
+			downloadId = testDownload.getId();
+	
+			ForbiddenException exception = assertThrows(ForbiddenException.class, () -> {
+				userResource.setDownloadStatus(testDownload.getId(), facilityName, sessionId, DownloadStatus.RESTORING.toString());
+			});
+			assertEquals("(403) : Cannot modify status of a QUEUED Download", exception.getMessage());
+	
+			Response response = userResource.getDownloads(facilityName, sessionId, null);
+			assertEquals(200, response.getStatus());
+			List<Download> downloads = (List<Download>) response.getEntity();
+	
+			Download unmodifiedDownload = findDownload(downloads, downloadId);
+			assertEquals(DownloadStatus.QUEUED, unmodifiedDownload.getStatus());
+		} finally {
+			if (downloadId != null) {
+				downloadRepository.removeDownload(downloadId);
+			}
+		}
 	}
 
 	@Test
@@ -278,6 +491,49 @@ public class UserResourceTest {
 			String message = json.getString("message");
 		} catch (Exception e) {
 			fail("One or both fields are not of the correct type: " + e.getMessage());
+		}
+	}
+
+	@Test
+	public void testGetDownloadStatusesBadRequest() throws MalformedURLException, TopcatException, ParseException {
+		ThrowingRunnable runnable = () -> userResource.getDownloadStatuses("LILS", sessionId, new ArrayList<>());
+		assertThrows(BadRequestException.class, runnable);
+	}
+
+	@Test
+	public void testGetDownloadNotFound() throws MalformedURLException, TopcatException, ParseException {
+		List<Long> downloadIds = new ArrayList<>();
+		try {
+			Download download = TestHelpers.createDummyDownload("simple/notroot", null, "http", true,
+					DownloadStatus.COMPLETE, false, downloadRepository);
+
+			downloadIds.add(download.getId());
+			ThrowingRunnable runnable = () -> userResource.getDownloadStatuses("LILS", sessionId, downloadIds);
+			assertThrows(NotFoundException.class, runnable);
+		} finally {
+			downloadIds.forEach(downloadId -> {
+				TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
+			});
+		}
+	}
+
+	@Test
+	public void testGetDownloadStatuses() throws MalformedURLException, TopcatException, ParseException {
+		List<Long> downloadIds = new ArrayList<>();
+		try {
+			Download download1 = TestHelpers.createDummyDownload("simple/root", null, "http", true,
+					DownloadStatus.COMPLETE, false, downloadRepository);
+			Download download2 = TestHelpers.createDummyDownload("simple/root", null, "http", true,
+					DownloadStatus.RESTORING, false, downloadRepository);
+
+			downloadIds.add(download1.getId());
+			downloadIds.add(download2.getId());
+			Response response = userResource.getDownloadStatuses("LILS", sessionId, downloadIds);
+			assertEquals(Arrays.asList(DownloadStatus.COMPLETE, DownloadStatus.RESTORING), response.getEntity());
+		} finally {
+			downloadIds.forEach(downloadId -> {
+				TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
+			});
 		}
 	}
 

@@ -129,112 +129,143 @@ public class AdminResourceTest {
 
 		// Create a new download for the test
 		Download testDownload = new Download();
-		testDownload.setFacilityName(facilityName);
-		testDownload.setSessionId(adminSessionId);
-		testDownload.setStatus(DownloadStatus.PREPARING);
-		testDownload.setIsDeleted(false);
-
-		// Other fields that can't be null, but which we (hopefully) don't really need:
-		testDownload.setUserName("simple/root");
-		testDownload.setFileName("testFile.txt");
-		testDownload.setTransport("http");
-
-		downloadRepository.save(testDownload);
-
-		// Get the current downloads - may not be empty
-		// It appears queryOffset cannot be empty!
-		String queryOffset = "1 = 1";
-		response = adminResource.getDownloads(facilityName, adminSessionId, queryOffset);
-		assertEquals(200, response.getStatus());
-
-		downloads = (List<Download>) response.getEntity();
-
-		// Check that the result tallies with the DownloadRepository contents
-
-		Map<String, Object> params = new HashMap<String, Object>();
-		params.put("queryOffset", queryOffset);
-		List<Download> repoDownloads = new ArrayList<Download>();
-		repoDownloads = downloadRepository.getDownloads(params);
-
-		assertEquals(repoDownloads.size(), downloads.size());
-		for (Download download : repoDownloads) {
-			assertNotNull(findDownload(downloads, download.getId()));
-		}
-
-		// Next, change the download status. Must be different from the current status!
-		String downloadStatus = "EXPIRED";
-		if (testDownload.getStatus().equals(DownloadStatus.valueOf(downloadStatus))) {
-			downloadStatus = "PAUSED";
-		}
-
-		response = adminResource.setDownloadStatus(testDownload.getId(), facilityName, adminSessionId, downloadStatus);
-		assertEquals(200, response.getStatus());
-
-		// and test that the new status has been set
-
-		response = adminResource.getDownloads(facilityName, adminSessionId, queryOffset);
-		assertEquals(200, response.getStatus());
-		downloads = (List<Download>) response.getEntity();
-
-		testDownload = findDownload(downloads, testDownload.getId());
-
-		// To be thorough, we ought to check that ONLY the status field has changed. Not
-		// going to!
-		assertEquals(DownloadStatus.valueOf(downloadStatus), testDownload.getStatus());
-
-		// Now toggle the deleted status - may have been deleted already!
-		Boolean currentDeleted = testDownload.getIsDeleted();
-
-		response = adminResource.deleteDownload(testDownload.getId(), facilityName, adminSessionId, !currentDeleted);
-		assertEquals(200, response.getStatus());
-
-		// and check that it has worked (again, not bothering to check that nothing else
-		// has changed)
-
-		response = adminResource.getDownloads(facilityName, adminSessionId, queryOffset);
-		assertEquals(200, response.getStatus());
-		downloads = (List<Download>) response.getEntity();
-
-		testDownload = findDownload(downloads, testDownload.getId());
-		assertTrue(testDownload.getIsDeleted() != currentDeleted);
-
-		// Test that getDownloadStatus() etc. produce an error response for a non-admin
-		// user
-
 		try {
-			response = adminResource.getDownloads(facilityName, nonAdminSessionId, queryOffset);
-			// We should not see the following
-			System.out.println("DEBUG: AdminRT.getDownloads response: " + response.getStatus() + ", "
-					+ (String) response.getEntity());
-			fail("AdminResource.getDownloads did not raise exception for non-admin user");
-		} catch (ForbiddenException fe) {
-			assertTrue(true);
+			testDownload.setFacilityName(facilityName);
+			testDownload.setSessionId(adminSessionId);
+			testDownload.setStatus(DownloadStatus.PREPARING);
+			testDownload.setIsDeleted(false);
+	
+			// Other fields that can't be null, but which we (hopefully) don't really need:
+			testDownload.setUserName("simple/root");
+			testDownload.setFileName("testFile.txt");
+			testDownload.setTransport("http");
+	
+			downloadRepository.save(testDownload);
+	
+			// Get the current downloads - may not be empty
+			response = adminResource.getDownloads(facilityName, adminSessionId, null);
+			assertEquals(200, response.getStatus());
+	
+			downloads = (List<Download>) response.getEntity();
+	
+			// Check that the result tallies with the DownloadRepository contents
+	
+			Map<String, Object> params = new HashMap<String, Object>();
+			List<Download> repoDownloads = new ArrayList<Download>();
+			repoDownloads = downloadRepository.getDownloads(params);
+	
+			assertEquals(repoDownloads.size(), downloads.size());
+			for (Download download : repoDownloads) {
+				assertNotNull(findDownload(downloads, download.getId()));
+			}
+	
+			// Next, change the download status. Must be different from the current status!
+			String downloadStatus = "EXPIRED";
+			if (testDownload.getStatus().equals(DownloadStatus.valueOf(downloadStatus))) {
+				downloadStatus = "PAUSED";
+			}
+	
+			response = adminResource.setDownloadStatus(testDownload.getId(), facilityName, adminSessionId, downloadStatus);
+			assertEquals(200, response.getStatus());
+	
+			// and test that the new status has been set
+	
+			response = adminResource.getDownloads(facilityName, adminSessionId, null);
+			assertEquals(200, response.getStatus());
+			downloads = (List<Download>) response.getEntity();
+	
+			testDownload = findDownload(downloads, testDownload.getId());
+	
+			// To be thorough, we ought to check that ONLY the status field has changed. Not
+			// going to!
+			assertEquals(DownloadStatus.valueOf(downloadStatus), testDownload.getStatus());
+	
+			// Now toggle the deleted status - may have been deleted already!
+			Boolean currentDeleted = testDownload.getIsDeleted();
+	
+			response = adminResource.deleteDownload(testDownload.getId(), facilityName, adminSessionId, !currentDeleted);
+			assertEquals(200, response.getStatus());
+	
+			// and check that it has worked (again, not bothering to check that nothing else
+			// has changed)
+	
+			response = adminResource.getDownloads(facilityName, adminSessionId, null);
+			assertEquals(200, response.getStatus());
+			downloads = (List<Download>) response.getEntity();
+	
+			testDownload = findDownload(downloads, testDownload.getId());
+			assertTrue(testDownload.getIsDeleted() != currentDeleted);
+	
+			// Test that getDownloadStatus() etc. produce an error response for a non-admin
+			// user
+	
+			try {
+				response = adminResource.getDownloads(facilityName, nonAdminSessionId, null);
+				// We should not see the following
+				System.out.println("DEBUG: AdminRT.getDownloads response: " + response.getStatus() + ", "
+						+ (String) response.getEntity());
+				fail("AdminResource.getDownloads did not raise exception for non-admin user");
+			} catch (ForbiddenException fe) {
+				assertTrue(true);
+			}
+	
+			try {
+				response = adminResource.setDownloadStatus(testDownload.getId(), facilityName, nonAdminSessionId,
+						downloadStatus);
+				// We should not see the following
+				System.out.println("DEBUG: AdminRT.setDownloadStatus response: " + response.getStatus() + ", "
+						+ (String) response.getEntity());
+				fail("AdminResource.setDownloadStatus did not raise exception for non-admin user");
+			} catch (ForbiddenException fe) {
+				assertTrue(true);
+			}
+	
+			try {
+				response = adminResource.deleteDownload(testDownload.getId(), facilityName, nonAdminSessionId,
+						!currentDeleted);
+				// We should not see the following
+				System.out.println("DEBUG: AdminRT.deleteDownload response: " + response.getStatus() + ", "
+						+ (String) response.getEntity());
+				fail("AdminResource.deleteDownload did not raise exception for non-admin user");
+			} catch (ForbiddenException fe) {
+				assertTrue(true);
+			}
+		} finally {
+			// Remove the test download from the repository
+			downloadRepository.removeDownload(testDownload.getId());
 		}
+	}
 
+	@Test
+	public void testSetDownloadStatus() throws Exception {
+		Long downloadId = null;
 		try {
-			response = adminResource.setDownloadStatus(testDownload.getId(), facilityName, nonAdminSessionId,
-					downloadStatus);
-			// We should not see the following
-			System.out.println("DEBUG: AdminRT.setDownloadStatus response: " + response.getStatus() + ", "
-					+ (String) response.getEntity());
-			fail("AdminResource.setDownloadStatus did not raise exception for non-admin user");
-		} catch (ForbiddenException fe) {
-			assertTrue(true);
-		}
+			Download testDownload = new Download();
+			String facilityName = "LILS";
+			testDownload.setFacilityName(facilityName);
+			testDownload.setSessionId(adminSessionId);
+			testDownload.setStatus(DownloadStatus.QUEUED);
+			testDownload.setIsDeleted(false);
+			testDownload.setUserName("simple/root");
+			testDownload.setFileName("testFile.txt");
+			testDownload.setTransport("http");
+			downloadRepository.save(testDownload);
+			downloadId = testDownload.getId();
 
-		try {
-			response = adminResource.deleteDownload(testDownload.getId(), facilityName, nonAdminSessionId,
-					!currentDeleted);
-			// We should not see the following
-			System.out.println("DEBUG: AdminRT.deleteDownload response: " + response.getStatus() + ", "
-					+ (String) response.getEntity());
-			fail("AdminResource.deleteDownload did not raise exception for non-admin user");
-		} catch (ForbiddenException fe) {
-			assertTrue(true);
-		}
+			Response response = adminResource.setDownloadStatus(downloadId, facilityName, adminSessionId, DownloadStatus.RESTORING.toString());
+			assertEquals(200, response.getStatus());
 
-		// Remove the test download from the repository
-		downloadRepository.removeDownload(testDownload.getId());
+			response = adminResource.getDownloads(facilityName, adminSessionId, null);
+			assertEquals(200, response.getStatus());
+			List<Download> downloads = (List<Download>) response.getEntity();
+
+			testDownload = findDownload(downloads, downloadId);
+			assertEquals(DownloadStatus.PREPARING, testDownload.getStatus());
+		} finally {
+			if (downloadId != null) {
+				downloadRepository.removeDownload(downloadId);
+			}
+		}
 	}
 
 	@Test

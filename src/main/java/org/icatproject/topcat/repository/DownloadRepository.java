@@ -5,6 +5,7 @@ import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.text.DateFormat;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
@@ -21,7 +22,9 @@ import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 
 import org.icatproject.topcat.domain.Download;
+import org.icatproject.topcat.domain.DownloadStatus;
 import org.icatproject.topcat.exceptions.BadRequestException;
+import org.icatproject.topcat.exceptions.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,7 +74,7 @@ public class DownloadRepository {
 				sb.append("WHERE " + queryOffset + " ");
 			}
 
-			logger.debug(sb.toString());
+			logger.trace(sb.toString());
 
 			TypedQuery<Download> query = em.createQuery(sb.toString(), Download.class);
 
@@ -84,7 +87,7 @@ public class DownloadRepository {
 				query.setMaxResults(limitPageSize);
 			}
 
-			logger.debug(query.toString());
+			logger.trace(query.toString());
 
 			downloads = query.getResultList();
 
@@ -95,6 +98,36 @@ public class DownloadRepository {
 		}
 
 		return downloads;
+	}
+
+	/**
+	 * Get the statuses from downloadIds.
+	 * 
+	 * @param userName    The formatted userName corresponding to the sessionId that
+	 *                    submitted the request
+	 * @param downloadIds List of ids to check
+	 * @return List of DownloadStatus for each downloadId
+	 * @throws NotFoundException If less Downloads are found than ids provided. In
+	 *                           practice, this either means the Download(s) do not
+	 *                           exist or they did not belong to the user submitting
+	 *                           the request.
+	 */
+	public List<DownloadStatus> getStatuses(String userName, List<Long> downloadIds) throws NotFoundException {
+		List<String> stringDownloadIds = new ArrayList<>();
+		for (Long downloadId : downloadIds) {
+			stringDownloadIds.add(downloadId.toString());
+		}
+		String joinedDownloadIds = String.join(",", stringDownloadIds);
+		String queryString = "SELECT download.status FROM Download download WHERE download.userName = '" + userName;
+		queryString += "' AND download.id IN (" + joinedDownloadIds + ")";
+		TypedQuery<DownloadStatus> query = em.createQuery(queryString, DownloadStatus.class);
+		List<DownloadStatus> resultList = query.getResultList();
+
+		if (resultList.size() < downloadIds.size()) {
+			throw new NotFoundException("Could not find a Download for each provided id");
+		}
+
+		return resultList;
 	}
 
 	public Download getDownload(Long id) {
