@@ -172,13 +172,15 @@ public class StatusCheck {
       if( idsClient == null ) {
     	  idsClient = new IdsClient(getDownloadUrl(download.getFacilityName(),download.getTransport()));
       }
-      if(!download.getIsEmailSent() && download.getStatus() == DownloadStatus.COMPLETE){
+      if (download.getStatus() == DownloadStatus.COMPLETE) {
     	  logger.info("Download COMPLETE for " + download.getFileName() + " " + download.getId() + "; checking whether to send email...");
-        download.setIsEmailSent(true);
-        em.persist(download);
-        em.flush();
         lastChecks.remove(download.getId());
-        sendDownloadReadyEmail(download);
+        if (!download.getIsEmailSent()) {
+          download.setIsEmailSent(true);
+          em.persist(download);
+          em.flush();
+          sendDownloadReadyEmail(download);
+        }
       } else if(download.getTransport().matches("https|http") && idsClient.isPrepared(download.getPreparedId())){
     	  logger.info("Download (http[s]) for " + download.getFileName() + " " + download.getId() + " is Prepared, so setting COMPLETE and checking email...");
         download.setStatus(DownloadStatus.COMPLETE);
@@ -203,7 +205,29 @@ public class StatusCheck {
     }
   }
 
-  private void sendDownloadReadyEmail(Download download) throws InternalException{
+  /**
+   * Send an email for a completed Download.
+   * 
+   * @param download Download that has completed
+   * @throws InternalException If download does not have a valid facilityName
+   */
+  private void sendDownloadReadyEmail(Download download) throws InternalException {
+    String downloadUrl = getDownloadUrl(download.getFacilityName(),download.getTransport());
+    downloadUrl += "/ids/getData?preparedId=" + download.getPreparedId();
+    downloadUrl += "&outname=" + download.getFileName();
+    sendDownloadReadyEmail(mailSession, download, downloadUrl);
+  }
+
+  /**
+   * Send an email for a completed Download, where downloadUrl may correspond to
+   * information that is custom to the transport mechanism and not readily available
+   * from the Download fields.
+   * 
+   * @param mailSession Jakarta mail session to use
+   * @param download    Download that has completed
+   * @param downloadUrl Possibly custom value to substitute into the message body
+   */
+  public static void sendDownloadReadyEmail(Session mailSession, Download download, String downloadUrl) {
     EmailValidator emailValidator = EmailValidator.getInstance();
     Properties properties = Properties.getInstance();
 
@@ -215,10 +239,6 @@ public class StatusCheck {
         if (fullName != null && !fullName.trim().isEmpty()) {
           userName = fullName;
         }
-
-        String downloadUrl = getDownloadUrl(download.getFacilityName(),download.getTransport());
-        downloadUrl += "/ids/getData?preparedId=" + download.getPreparedId();
-        downloadUrl += "&outname=" + download.getFileName();
 
         Map<String, String> valuesMap = new HashMap<String, String>();
         valuesMap.put("email", download.getEmail());

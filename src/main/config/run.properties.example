@@ -50,6 +50,10 @@ mail.body.smartclient=Hi ${userName}, \n\nYour ${size} SmartClient download ${fi
 # The email body message for SCARF downloads. All subject tokens as above are available.
 mail.body.scarf=Hi ${userName}, \n\nYour ${size} SCARF download ${fileName} is ready. Please see https:/example.com/#/scarf-faq for more information on how to download using SCARF.\n\nThank you for using TopCAT
 
+# The email body message for Ada downloads. All subject tokens as above are available.
+mail.body.ada = Hi ${userName}, \n\nYour ${size} recall ${fileName} is ready as an Ada data share. Please visit https:/example.com to redeem access using the following token.\n\n${downloadUrl}\n\nThank you for using DataGateway
+mail.required.ada = true
+
 # The maximum number of datafiles for a getStatus call to the IDS for two level storage
 ids.getStatus.max=100
 
