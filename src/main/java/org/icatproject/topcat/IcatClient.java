@@ -433,7 +433,7 @@ public class IcatClient {
 		if (userPriority != null) {
 			return userPriority;
 		}
-		HashMap<Integer, String> mapping = priorityMap.getMapping();
+		HashMap<Integer, String> mapping = priorityMap.getQueryMapping();
 		List<Integer> keyList = new ArrayList<>(mapping.keySet());
 		Collections.sort(keyList);
 		for (Integer priority : keyList) {
@@ -442,13 +442,7 @@ public class IcatClient {
 			}
 		}
 
-		String anonUserName = Properties.getInstance().getProperty("anonUserName");
-		if (anonUserName == null || !userName.startsWith(anonUserName)) {
-			// The anonymous cart username will end with the user's sessionId so cannot do .equals
-			return priorityMap.getAuthenticatedPriority();
-		} else {
-			return priorityMap.getDefaultPriority();
-		}
+		return priorityMap.getAuthenticatedPriority(userName);
 	}
 
 	/**

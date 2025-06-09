@@ -131,8 +131,12 @@ queue.priority.instrumentScientist.instruments = {"ABC": 1}
 queue.priority.instrumentScientist.default = 2
 queue.priority.investigationUser.roles = {"ABC": 3}
 queue.priority.investigationUser.default = 4
-queue.priority.authenticated = 5
-queue.priority.default = 0
+queue.priority.authenticated = {"orcid": 6, "anon": 0}
+queue.priority.default = 5
+
+# Restrict access to transport mechanisms at a given facility based on authentication prefix
+# Note that any missing value (at the facility, transport, or prefix level) will default to true (allowed)
+transportAllowed = {"LILS": {"globus": {"anon": false, "orcid": true}, "lils": {"anon": false, "orcid": false}}, "YFH": {}}
 
 # Configurable limit for the length of the GET URL for requesting Datafiles by a list of file locations
 # The exact limit may depend on the server

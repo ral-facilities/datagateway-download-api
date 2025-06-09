@@ -42,6 +42,7 @@ import org.icatproject.topcat.PriorityMap;
 import org.icatproject.topcat.FacilityMap;
 import org.icatproject.topcat.IcatClient;
 import org.icatproject.topcat.Properties;
+import org.icatproject.topcat.TransportMap;
 import org.icatproject.topcat.IcatClient.DatafilesResponse;
 
 @Stateless
@@ -736,6 +737,8 @@ public class UserResource {
 		String userName = icatClient.getUserName();
 		PriorityMap priorityMap = PriorityMap.getInstance();
 		priorityMap.checkAnonDownloadEnabled(userName);
+		TransportMap transportMap = TransportMap.getInstance();
+		transportMap.checkAllowed(facilityName, transport, userName);
 		String cartUserName = getCartUserName(userName, sessionId);
 
 		logger.info("submitCart: get cart for user: " + cartUserName + ", facility: " + facilityName + "...");
@@ -891,6 +894,8 @@ public class UserResource {
 		String userName = icatClient.getUserName();
 		String fullName = icatClient.getFullName();
 		icatClient.checkQueueAllowed(userName);
+		TransportMap transportMap = TransportMap.getInstance();
+		transportMap.checkAllowed(facilityName, transport, userName);
 		JsonArray datasets = icatClient.getDatasets(visitId);
 		if (datasets.size() == 0) {
 			throw new NotFoundException("No Datasets found for " + visitId);
@@ -1018,6 +1023,8 @@ public class UserResource {
 		String userName = icatClient.getUserName();
 		String fullName = icatClient.getFullName();
 		icatClient.checkQueueAllowed(userName);
+		TransportMap transportMap = TransportMap.getInstance();
+		transportMap.checkAllowed(facilityName, transport, userName);
 
 		DatafilesResponse response = icatClient.getDatafiles(files);
 		if (response.ids.size() == 0) {
