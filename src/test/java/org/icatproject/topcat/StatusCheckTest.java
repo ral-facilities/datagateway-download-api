@@ -5,16 +5,21 @@ import java.util.concurrent.TimeUnit;
 import java.io.IOException;
 
 import org.jboss.arquillian.container.test.api.Deployment;
-import org.jboss.arquillian.junit.Arquillian;
+import org.jboss.arquillian.junit5.container.annotation.ArquillianTest;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.asset.EmptyAsset;
 import org.jboss.shrinkwrap.api.spec.JavaArchive;
 
 import org.jboss.arquillian.transaction.api.annotation.Transactional;
 
-import static org.junit.Assert.*;
-import org.junit.*;
-import org.junit.runner.RunWith;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import jakarta.inject.Inject;
 import jakarta.ejb.EJB;
 
@@ -22,7 +27,7 @@ import org.icatproject.topcat.domain.*;
 import org.icatproject.topcat.exceptions.TopcatException;
 import org.icatproject.topcat.repository.DownloadRepository;
 
-@RunWith(Arquillian.class)
+@ArquillianTest
 public class StatusCheckTest {
 
 	@Deployment
@@ -130,7 +135,7 @@ public class StatusCheckTest {
 	@Inject
 	private StatusCheck statusCheck;
 
-	@BeforeClass
+	@BeforeAll
 	public static void beforeAll() {
 		TestHelpers.installTrustManager();
 	}
@@ -860,9 +865,9 @@ public class StatusCheckTest {
 			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
 
 			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
-			assertNotNull("Expected RESTORING Download to still have preparedId set", postDownload1.getPreparedId());
+			assertNotNull(postDownload1.getPreparedId(), "Expected RESTORING Download to still have preparedId set");
 			assertEquals(DownloadStatus.QUEUED, postDownload2.getStatus());
-			assertNull("Expected QUEUED Download to not have preparedId set", postDownload2.getPreparedId());
+			assertNull(postDownload2.getPreparedId(), "Expected QUEUED Download to not have preparedId set");
 		} finally {
 			// clean up
 			TestHelpers.deleteDummyDownload(downloadId1, downloadRepository);

@@ -1,10 +1,16 @@
 package org.icatproject.topcat;
 
 import java.util.*;
-import java.lang.reflect.*;
 
-import static org.junit.Assert.*;
-import org.junit.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import jakarta.json.*;
 import jakarta.json.JsonValue.ValueType;
@@ -30,12 +36,12 @@ public class IcatClientTest {
 
 	private Connection connection;
 
-	@BeforeClass
+	@BeforeAll
 	public static void beforeAll() {
 		TestHelpers.installTrustManager();
 	}
 
-	@Before
+	@BeforeEach
 	public void setup() throws Exception {
 		HttpClient httpClient = new HttpClient("https://localhost:8181/icat");
 		String data = "json=" + URLEncoder.encode(

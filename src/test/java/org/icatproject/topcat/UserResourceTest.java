@@ -2,18 +2,26 @@ package org.icatproject.topcat;
 
 import java.util.*;
 import java.io.File;
-import java.lang.reflect.*;
 
 import org.jboss.arquillian.container.test.api.Deployment;
-import org.jboss.arquillian.junit.Arquillian;
+import org.jboss.arquillian.junit5.container.annotation.ArquillianTest;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.asset.EmptyAsset;
 import org.jboss.shrinkwrap.api.spec.JavaArchive;
 
-import static org.junit.Assert.*;
-import org.junit.*;
-import org.junit.function.ThrowingRunnable;
-import org.junit.runner.RunWith;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import jakarta.inject.Inject;
 
 import jakarta.json.*;
@@ -39,7 +47,7 @@ import org.icatproject.topcat.web.rest.UserResource;
 import java.sql.*;
 import java.text.ParseException;
 
-@RunWith(Arquillian.class)
+@ArquillianTest
 public class UserResourceTest {
 
 	/*
@@ -76,12 +84,12 @@ public class UserResourceTest {
 
 	private Connection connection;
 
-	@BeforeClass
+	@BeforeAll
 	public static void beforeAll() {
 		TestHelpers.installTrustManager();
 	}
 
-	@Before
+	@BeforeEach
 	public void setup() throws Exception {
 		HttpClient httpClient = new HttpClient("https://localhost:8181/icat");
 		String loginData = "json=" + URLEncoder.encode(
@@ -97,7 +105,7 @@ public class UserResourceTest {
 		String loginResponseString = userResource.login(null, "root", "pw", null);
 		JsonObject loginResponseObject = Utils.parseJsonObject(loginResponseString);
 
-		assertEquals(loginResponseObject.toString(), 1, loginResponseObject.keySet().size());
+		assertEquals(1, loginResponseObject.keySet().size(), loginResponseObject.toString());
 		assertTrue(loginResponseObject.containsKey("sessionId"));
 		// Will throw if not a UUID
 		UUID.fromString(loginResponseObject.getString("sessionId"));
@@ -228,7 +236,7 @@ public class UserResourceTest {
 		assertEquals(transport, newDownload.getTransport());
 		// Email is slightly fiddly:
 		if (email.equals("")) {
-			assertEquals(null, newDownload.getEmail());
+			assertNull(newDownload.getEmail());
 		} else {
 			assertEquals(email, newDownload.getEmail());
 		}
@@ -324,7 +332,7 @@ public class UserResourceTest {
 		String facilityName = "LILS";
 		String transport = "http";
 		String email = "";
-		ThrowingRunnable runnable = () -> userResource.queueVisitId(facilityName, sessionId, transport, null, email, null);
+		Executable runnable = () -> userResource.queueVisitId(facilityName, sessionId, transport, null, email, null);
 		Throwable throwable = assertThrows(BadRequestException.class, runnable);
 		assertEquals("(400) : visitId must be provided", throwable.getMessage());
 
@@ -340,7 +348,7 @@ public class UserResourceTest {
 		String transport = "http";
 		String email = "";
 		String visitId = "test";
-		ThrowingRunnable runnable = () -> userResource.queueVisitId(facilityName, sessionId, transport, null, email, visitId);
+		Executable runnable = () -> userResource.queueVisitId(facilityName, sessionId, transport, null, email, visitId);
 		Throwable throwable = assertThrows(NotFoundException.class, runnable);
 		assertEquals("(404) : No Datasets found for " + visitId, throwable.getMessage());
 	}
@@ -392,7 +400,7 @@ public class UserResourceTest {
 		String facilityName = "LILS";
 		String transport = "http";
 		String email = "";
-		ThrowingRunnable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, null);
+		Executable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, null);
 		Throwable throwable = assertThrows(BadRequestException.class, runnable);
 		assertEquals("(400) : At least one Datafile.location required", throwable.getMessage());
 
@@ -408,7 +416,7 @@ public class UserResourceTest {
 		String transport = "http";
 		String email = "";
 		List<String> files = List.of("1", "2", "3", "4");
-		ThrowingRunnable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, files);
+		Executable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, files);
 		Throwable throwable = assertThrows(BadRequestException.class, runnable);
 		assertEquals("(400) : Limit of 3 files exceeded", throwable.getMessage());
 	}
@@ -419,7 +427,7 @@ public class UserResourceTest {
 		String facilityName = "LILS";
 		String transport = "http";
 		String email = "";
-		ThrowingRunnable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, List.of("test"));
+		Executable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, List.of("test"));
 		Throwable throwable = assertThrows(NotFoundException.class, runnable);
 		assertEquals("(404) : No Datafiles found", throwable.getMessage());
 	}
@@ -496,7 +504,7 @@ public class UserResourceTest {
 
 	@Test
 	public void testGetDownloadStatusesBadRequest() throws MalformedURLException, TopcatException, ParseException {
-		ThrowingRunnable runnable = () -> userResource.getDownloadStatuses("LILS", sessionId, new ArrayList<>());
+		Executable runnable = () -> userResource.getDownloadStatuses("LILS", sessionId, new ArrayList<>());
 		assertThrows(BadRequestException.class, runnable);
 	}
 
@@ -508,7 +516,7 @@ public class UserResourceTest {
 					DownloadStatus.COMPLETE, false, downloadRepository);
 
 			downloadIds.add(download.getId());
-			ThrowingRunnable runnable = () -> userResource.getDownloadStatuses("LILS", sessionId, downloadIds);
+			Executable runnable = () -> userResource.getDownloadStatuses("LILS", sessionId, downloadIds);
 			assertThrows(NotFoundException.class, runnable);
 		} finally {
 			downloadIds.forEach(downloadId -> {

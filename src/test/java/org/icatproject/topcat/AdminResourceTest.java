@@ -3,17 +3,23 @@ package org.icatproject.topcat;
 import java.util.*;
 import java.util.Date;
 import java.io.File;
-import java.lang.reflect.*;
 
 import org.jboss.arquillian.container.test.api.Deployment;
-import org.jboss.arquillian.junit.Arquillian;
+import org.jboss.arquillian.junit5.container.annotation.ArquillianTest;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.asset.EmptyAsset;
 import org.jboss.shrinkwrap.api.spec.JavaArchive;
 
-import static org.junit.Assert.*;
-import org.junit.*;
-import org.junit.runner.RunWith;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import jakarta.inject.Inject;
 
 import jakarta.json.*;
@@ -35,7 +41,7 @@ import org.icatproject.topcat.web.rest.AdminResource;
 
 import java.sql.*;
 
-@RunWith(Arquillian.class)
+@ArquillianTest
 public class AdminResourceTest {
 
 	/*
@@ -71,12 +77,12 @@ public class AdminResourceTest {
 	private static String adminSessionId;
 	private static String nonAdminSessionId;
 
-	@BeforeClass
+	@BeforeAll
 	public static void beforeAll() {
 		TestHelpers.installTrustManager();
 	}
 
-	@Before
+	@BeforeEach
 	public void setup() throws Exception {
 		HttpClient httpClient = new HttpClient("https://localhost:8181/icat");
 
@@ -194,7 +200,7 @@ public class AdminResourceTest {
 			downloads = (List<Download>) response.getEntity();
 	
 			testDownload = findDownload(downloads, testDownload.getId());
-			assertTrue(testDownload.getIsDeleted() != currentDeleted);
+			assertNotEquals(testDownload.getIsDeleted(), currentDeleted);
 	
 			// Test that getDownloadStatus() etc. produce an error response for a non-admin
 			// user
@@ -206,7 +212,6 @@ public class AdminResourceTest {
 						+ (String) response.getEntity());
 				fail("AdminResource.getDownloads did not raise exception for non-admin user");
 			} catch (ForbiddenException fe) {
-				assertTrue(true);
 			}
 	
 			try {
@@ -217,7 +222,6 @@ public class AdminResourceTest {
 						+ (String) response.getEntity());
 				fail("AdminResource.setDownloadStatus did not raise exception for non-admin user");
 			} catch (ForbiddenException fe) {
-				assertTrue(true);
 			}
 	
 			try {
@@ -228,7 +232,6 @@ public class AdminResourceTest {
 						+ (String) response.getEntity());
 				fail("AdminResource.deleteDownload did not raise exception for non-admin user");
 			} catch (ForbiddenException fe) {
-				assertTrue(true);
 			}
 		} finally {
 			// Remove the test download from the repository
@@ -308,7 +311,7 @@ public class AdminResourceTest {
 		if (dt != null) {
 			System.out.println(
 					"DEBUG: AdminRT final download type status is {" + dt.getDisabled() + "," + dt.getMessage() + "}");
-			assertTrue(disabled != dt.getDisabled());
+			assertNotEquals(disabled, dt.getDisabled());
 			assertEquals(message, dt.getMessage());
 		}
 
@@ -322,7 +325,6 @@ public class AdminResourceTest {
 					+ (String) response.getEntity());
 			fail("AdminResource.setDownloadTypeStatus did not raise exception for non-admin user");
 		} catch (ForbiddenException fe) {
-			assertTrue(true);
 		}
 
 		// Finally, ought to reset the disabled status to the original value!
@@ -406,7 +408,6 @@ public class AdminResourceTest {
 					+ (String) response.getEntity());
 			fail("AdminResource.clearCachedSize did not raise exception for non-admin user");
 		} catch (ForbiddenException fe) {
-			assertTrue(true);
 		}
 	}
 
@@ -437,7 +438,6 @@ public class AdminResourceTest {
 					+ (String) response.getEntity());
 			fail("AdminResource.setConfVar did not raise exception for non-admin user");
 		} catch (ForbiddenException fe) {
-			assertTrue(true);
 		}
 	}
 
