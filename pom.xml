@@ -244,7 +244,9 @@
 						<artifactId>maven-surefire-plugin</artifactId>
 						<version>3.5.3</version>
 						<configuration>
-							<argLine>-Xmx768m -XX:MaxMetaspaceSize=256m</argLine>
+							<!-- Required for jdk 17+ -->
+							<argLine>--add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+
 							<systemPropertyVariables>
 								<java.util.logging.config.file>
 									${project.build.testOutputDirectory}/logging.properties
