@@ -1,7 +1,20 @@
 package org.icatproject.topcat;
 
-import java.util.*;
-import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URLEncoder;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
+
+import jakarta.ejb.EJB;
+import jakarta.inject.Inject;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonNumber;
+import jakarta.json.JsonObject;
+import jakarta.ws.rs.core.Response;
 
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.junit5.container.annotation.ArquillianTest;
@@ -22,30 +35,20 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
-import jakarta.inject.Inject;
-
-import jakarta.json.*;
-import jakarta.ws.rs.core.Response;
-import jakarta.ejb.EJB;
 
 import org.icatproject.topcat.httpclient.HttpClient;
-import org.icatproject.topcat.domain.*;
+import org.icatproject.topcat.domain.Cart;
+import org.icatproject.topcat.domain.Download;
+import org.icatproject.topcat.domain.DownloadStatus;
 import org.icatproject.topcat.exceptions.BadRequestException;
 import org.icatproject.topcat.exceptions.ForbiddenException;
 import org.icatproject.topcat.exceptions.NotFoundException;
 import org.icatproject.topcat.exceptions.TopcatException;
-
-import java.net.MalformedURLException;
-import java.net.URLEncoder;
-
 import org.icatproject.topcat.repository.CacheRepository;
 import org.icatproject.topcat.repository.CartRepository;
 import org.icatproject.topcat.repository.DownloadRepository;
 import org.icatproject.topcat.repository.DownloadTypeRepository;
 import org.icatproject.topcat.web.rest.UserResource;
-
-import java.sql.*;
-import java.text.ParseException;
 
 @ArquillianTest
 public class UserResourceTest {
@@ -82,8 +85,6 @@ public class UserResourceTest {
 
 	private static String sessionId;
 
-	private Connection connection;
-
 	@BeforeAll
 	public static void beforeAll() {
 		TestHelpers.installTrustManager();
@@ -96,8 +97,6 @@ public class UserResourceTest {
 				"{\"plugin\":\"simple\", \"credentials\":[{\"username\":\"root\"}, {\"password\":\"pw\"}]}", "UTF8");
 		String response = httpClient.post("session", new HashMap<String, String>(), loginData).toString();
 		sessionId = Utils.parseJsonObject(response).getString("sessionId");
-
-		connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/icatdb", "icatdbuser", "icatdbuserpw");
 	}
 
 	@Test

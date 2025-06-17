@@ -1,8 +1,16 @@
 package org.icatproject.topcat;
 
-import java.util.*;
+import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.Date;
-import java.io.File;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import jakarta.inject.Inject;
+import jakarta.json.JsonObject;
+import jakarta.ejb.EJB;
+import jakarta.ws.rs.core.Response;
 
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.junit5.container.annotation.ArquillianTest;
@@ -20,26 +28,17 @@ import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import jakarta.inject.Inject;
-
-import jakarta.json.*;
-import jakarta.ws.rs.core.Response;
-import jakarta.ejb.EJB;
 
 import org.icatproject.topcat.httpclient.HttpClient;
-import org.icatproject.topcat.domain.*;
-import org.icatproject.topcat.exceptions.BadRequestException;
+import org.icatproject.topcat.domain.Download;
+import org.icatproject.topcat.domain.DownloadStatus;
+import org.icatproject.topcat.domain.DownloadType;
 import org.icatproject.topcat.exceptions.ForbiddenException;
-
-import java.net.URLEncoder;
-
 import org.icatproject.topcat.repository.CacheRepository;
 import org.icatproject.topcat.repository.ConfVarRepository;
 import org.icatproject.topcat.repository.DownloadRepository;
 import org.icatproject.topcat.repository.DownloadTypeRepository;
 import org.icatproject.topcat.web.rest.AdminResource;
-
-import java.sql.*;
 
 @ArquillianTest
 public class AdminResourceTest {

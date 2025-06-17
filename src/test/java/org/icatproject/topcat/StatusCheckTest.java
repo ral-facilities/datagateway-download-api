@@ -1,16 +1,19 @@
 package org.icatproject.topcat;
 
-import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.io.IOException;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import jakarta.inject.Inject;
+import jakarta.ejb.EJB;
 
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.junit5.container.annotation.ArquillianTest;
+import org.jboss.arquillian.transaction.api.annotation.Transactional;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.asset.EmptyAsset;
 import org.jboss.shrinkwrap.api.spec.JavaArchive;
-
-import org.jboss.arquillian.transaction.api.annotation.Transactional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -20,10 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import jakarta.inject.Inject;
-import jakarta.ejb.EJB;
 
-import org.icatproject.topcat.domain.*;
+import org.icatproject.topcat.domain.Download;
+import org.icatproject.topcat.domain.DownloadStatus;
 import org.icatproject.topcat.exceptions.TopcatException;
 import org.icatproject.topcat.repository.DownloadRepository;
 
