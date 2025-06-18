@@ -1,13 +1,14 @@
 package org.icatproject.topcat;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import org.icatproject.topcat.exceptions.InternalException;
-import org.junit.*;
-import org.junit.function.ThrowingRunnable;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 public class FacilityMapTest {
 	
@@ -153,7 +154,7 @@ public class FacilityMapTest {
 
 		FacilityMap facilityMap = new FacilityMap(props);
 
-		ThrowingRunnable runnable = () -> {facilityMap.getIcatUrl(null);};
+		Executable runnable = () -> {facilityMap.getIcatUrl(null);};
 		assertThrows(InternalException.class, runnable);
 	}
 }

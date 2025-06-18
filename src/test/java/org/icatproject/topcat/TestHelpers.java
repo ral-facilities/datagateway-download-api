@@ -7,7 +7,6 @@ import javax.net.ssl.X509TrustManager;
 import org.icatproject.topcat.domain.Download;
 import org.icatproject.topcat.domain.DownloadItem;
 import org.icatproject.topcat.domain.DownloadStatus;
-import org.icatproject.topcat.domain.EntityType;
 import org.icatproject.topcat.repository.DownloadRepository;
 
 import javax.net.ssl.HttpsURLConnection;
