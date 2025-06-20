@@ -263,7 +263,7 @@ public class IcatClient {
 	 * @return JsonArray of results, contents will depend on the query.
 	 * @throws TopcatException
 	 */
-	public JsonArray submitQuery(String query) throws TopcatException {
+	private JsonArray submitQuery(String query) throws TopcatException {
 		try {
 			String encodedQuery = URLEncoder.encode(query, "UTF8");
 			String url = "entityManager?sessionId=" + URLEncoder.encode(sessionId, "UTF8") + "&query=" + encodedQuery;

@@ -8,7 +8,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
 
-import org.icatproject.topcat.domain.Download;
 import org.icatproject.topcat.domain.DownloadType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
