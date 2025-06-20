@@ -263,7 +263,7 @@ public class IcatClient {
 	 * @return JsonArray of results, contents will depend on the query.
 	 * @throws TopcatException
 	 */
-	private JsonArray submitQuery(String query) throws TopcatException {
+	public JsonArray submitQuery(String query) throws TopcatException {
 		try {
 			String encodedQuery = URLEncoder.encode(query, "UTF8");
 			String url = "entityManager?sessionId=" + URLEncoder.encode(sessionId, "UTF8") + "&query=" + encodedQuery;
@@ -459,8 +459,28 @@ public class IcatClient {
 		return results.size();
 	}
 
+	/**
+	 * @param userName  ICAT User.name
+	 * @param groupings ICAT Grouping.names
+	 * @return whether userName is in any of the named groupings
+	 * @throws TopcatException if the query fails
+	 */
+	public boolean isInGroups(String userName, Set<String> groupings) throws TopcatException {
+		String query = "SELECT userGroup FROM UserGroup userGroup WHERE userGroup.user.name = :user";
+		query += " AND userGroup.grouping.name IN ('" + String.join("','", groupings) + "')";
+		JsonArray results = submitQuery(query);
+		return results.size() > 0;
+	}
+
 	protected String[] getAdminUserNames() throws Exception {
 		return Properties.getInstance().getProperty("adminUserNames", "").split("([ ]*,[ ]*|[ ]+)");
+	}
+
+	/**
+	 * @param sessionId ICAT sessionId
+	 */
+	public void setSessionId(String sessionId) {
+		this.sessionId = sessionId;
 	}
 
 }

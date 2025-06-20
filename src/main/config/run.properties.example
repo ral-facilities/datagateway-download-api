@@ -22,8 +22,19 @@ facility.YFH.idsUrl = https://your.facility.idsUrl.here
 # If the property is not defined, Topcat will use the facility's idsUrl by default.
 
 facility.LILS.downloadType.http = http://localhost:8080
+facility.LILS.downloadType.list = http
+facility.LILS.downloadType.http.displayName = HTTP
+facility.LILS.downloadType.http.description = Example description for HTTP access method.
+
+facility.YFH.downloadType.list = https globus
 facility.YFH.downloadType.https = https://your.facility.downloadIdsUrl.here
+facility.YFH.downloadType.https.displayName = HTTPS
+facility.YFH.downloadType.https.description = Example description for HTTPS access method.
+facility.YFH.downloadType.https.disallowedAuthn = simple db
 facility.YFH.downloadType.globus = https://your.facility.globusUrl.here
+facility.YFH.downloadType.globus.displayName = Globus
+facility.YFH.downloadType.globus.description = Example description for Globus access method.
+facility.YFH.downloadType.globus.allowedGroupings = principal_beamline_scientists admins
 
 # enable send email
 mail.enable=true
@@ -133,10 +144,6 @@ queue.priority.investigationUser.roles = {"ABC": 3}
 queue.priority.investigationUser.default = 4
 queue.priority.authenticated = {"orcid": 6, "anon": 0}
 queue.priority.default = 5
-
-# Restrict access to transport mechanisms at a given facility based on authentication prefix
-# Note that any missing value (at the facility, transport, or prefix level) will default to true (allowed)
-transportAllowed = {"LILS": {"globus": {"anon": false, "orcid": true}, "lils": {"anon": false, "orcid": false}}, "YFH": {}}
 
 # Configurable limit for the length of the GET URL for requesting Datafiles by a list of file locations
 # The exact limit may depend on the server
