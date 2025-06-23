@@ -1,10 +1,14 @@
 package org.icatproject.topcat;
 
-import java.util.*;
-import java.lang.reflect.*;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
-import static org.junit.Assert.*;
-import org.junit.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 public class IdsClientTest {
 
@@ -54,16 +58,15 @@ public class IdsClientTest {
 				}
 				allFound = allFound && foundInvestigation && foundDataset && foundDatafile;
 			}
-			assertTrue("Not all IDs found in chunks", allFound);
-			assertTrue("At least one ID was repeated", ! foundRepeats);
+			assertTrue(allFound, "Not all IDs found in chunks");
+			assertFalse(foundRepeats, "At least one ID was repeated");
 		}
 
 		String expected = "test?investigationIds=1,2,3&datasetIds=4,5,6&datafileIds=7,8,9";
 		List<String> offsets = (List<String>) chunkOffsets.invoke(idsClient, "test?", generateIds(1, 3), generateIds(4, 3), generateIds(7, 3));
 		String actual = offsets.get(0);
 
-		assertTrue("expected: " + expected + " actual: " + actual, expected.equals(actual));
-
+		assertEquals(expected, actual);
 	}
 	
 	@Test
