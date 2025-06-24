@@ -40,6 +40,7 @@ import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.domain.Cart;
 import org.icatproject.topcat.domain.Download;
 import org.icatproject.topcat.domain.DownloadStatus;
+import org.icatproject.topcat.domain.DownloadType;
 import org.icatproject.topcat.exceptions.BadRequestException;
 import org.icatproject.topcat.exceptions.ForbiddenException;
 import org.icatproject.topcat.exceptions.NotFoundException;
@@ -534,7 +535,7 @@ public class UserResourceTest {
 			JsonObject json = Utils.parseJsonObject(response.getEntity().toString());
 
 			JsonObject httpObject = json.getJsonObject("http");
-			assertNotNull("Keys were: " + json.keySet(), httpObject);
+			assertNotNull(httpObject, "Keys were: " + json.keySet());
 			assertFalse(httpObject.getBoolean("disabled"));
 			assertEquals("Disabled for testing", httpObject.getString("message"));
 			assertEquals("https://localhost:8181", httpObject.getString("idsUrl"));
@@ -542,7 +543,7 @@ public class UserResourceTest {
 			assertEquals("Example description for HTTP access method.", httpObject.getString("description"));
 
 			JsonObject globusObject = json.getJsonObject("globus");
-			assertNotNull("Keys were: " + json.keySet(), globusObject);
+			assertNotNull(globusObject, "Keys were: " + json.keySet());
 			assertFalse(globusObject.getBoolean("disabled"));
 			assertEquals("Disabled for testing", globusObject.getString("message"));
 			assertEquals("https://localhost:8181", globusObject.getString("idsUrl"));

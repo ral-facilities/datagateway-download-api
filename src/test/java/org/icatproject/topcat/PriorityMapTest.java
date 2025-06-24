@@ -21,7 +21,7 @@ public class PriorityMapTest {
         assertEquals(0, priorityMap.getAuthenticatedPriority("anon/anon").intValue());
         assertEquals(2, priorityMap.getAuthenticatedPriority("simple/test").intValue());
         assertEquals(2, priorityMap.getAuthenticatedPriority("test").intValue());
-        assertEquals(priorityMap.getQueryMapping().toString(), 0, priorityMap.getQueryMapping().size());
+        assertEquals(0, priorityMap.getQueryMapping().size(), priorityMap.getQueryMapping().toString());
         long userPriority = priorityMap.getUserPriority("simple/test");
         assertEquals(1L, userPriority);
         assertEquals(null, priorityMap.getUserPriority("simple/fail"));
@@ -40,7 +40,7 @@ public class PriorityMapTest {
         String expected = conditionPrefix + "ABC' AND o.user=user ) OR "+ conditionPrefix + "JKL' AND o.user=user )";
         method.invoke(priorityMap, objectString, conditionPrefix);
         HashMap<Integer, String> mapping = priorityMap.getQueryMapping();
-        assertEquals(mapping.toString(), 1, mapping.size());
+        assertEquals(1, mapping.size(), mapping.toString());
         assertEquals(expected, mapping.get(1));
     }
 

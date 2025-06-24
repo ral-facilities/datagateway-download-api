@@ -1,13 +1,13 @@
 package org.icatproject.topcat;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
 
 import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.httpclient.Response;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import jakarta.json.Json;
 import jakarta.json.JsonArray;
