@@ -1,25 +1,22 @@
 package org.icatproject.topcat;
 
-import java.util.*;
-import java.lang.reflect.*;
+import jakarta.inject.Inject;
 
 import org.jboss.arquillian.container.test.api.Deployment;
-import org.jboss.arquillian.junit.Arquillian;
+import org.jboss.arquillian.junit5.container.annotation.ArquillianTest;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.asset.EmptyAsset;
 import org.jboss.shrinkwrap.api.spec.JavaArchive;
-import static org.junit.Assert.*;
-import org.junit.*;
-import org.junit.runner.RunWith;
-import jakarta.inject.Inject;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
-import jakarta.ejb.EJB;
+import org.junit.jupiter.api.Test;
 
 import org.icatproject.topcat.domain.Cache;
 import org.icatproject.topcat.repository.CacheRepository;
 
-@RunWith(Arquillian.class)
+@ArquillianTest
 public class CacheRepositoryTest {
 
     @Deployment
@@ -44,6 +41,6 @@ public class CacheRepositoryTest {
 		String key = "test:remove";
 		cacheRepository.put(key, "Hello World");
 		cacheRepository.remove(key);
-		assertEquals(null,cacheRepository.get(key));
+		assertNull(cacheRepository.get(key));
 	}
 }
