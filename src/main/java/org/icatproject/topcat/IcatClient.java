@@ -411,7 +411,15 @@ public class IcatClient {
 	 *                         another internal error is triggered)
 	 */
 	public void checkQueueAllowed(String userName) throws TopcatException {
-		if (getQueuePriority(userName) < 1) {
+		checkQueueAllowed(getQueuePriority(userName));
+	}
+
+	/**
+	 * @param priority int priority to check
+	 * @throws TopcatException if priority < 1
+	 */
+	public void checkQueueAllowed(int priority) throws TopcatException {
+		if (priority < 1) {
 			throw new ForbiddenException("Queuing Downloads forbidden");
 		}
 	}

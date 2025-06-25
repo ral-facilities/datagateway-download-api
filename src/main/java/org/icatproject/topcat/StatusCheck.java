@@ -397,8 +397,8 @@ public class StatusCheck {
       availableDownloads -= activeDownloadsSize;
     }
 
-    String queuedQueryString = selectString + " and " + queuedCondition;
-    queuedQueryString += " order by download.createdAt";
+    String queuedQueryString = selectString + " and " + queuedCondition + " and download.priority > 0";
+    queuedQueryString += " order by download.priority asc NULLS FIRST, download.createdAt asc";
     TypedQuery<Download> queuedDownloadsQuery = em.createQuery(queuedQueryString, Download.class);
     List<Download> queuedDownloads = queuedDownloadsQuery.getResultList();
     int queueSize = queuedDownloads.size();
@@ -410,42 +410,12 @@ public class StatusCheck {
     if (maxActiveDownloads <= 0) {
       // No limits on how many to submit
       logger.info("Preparing 1 out of {} queued downloads", queueSize);
-      Download queuedDownload = queuedDownloads.get(0);
-      queuedDownload.setStatus(DownloadStatus.PREPARING);
-      prepareDownload(queuedDownload, null, getQueueSessionId(sessionIds, queuedDownload.getFacilityName()));
     } else {
       logger.info("Preparing 1 out of {} queued downloads as {} spaces available", queueSize, availableDownloads);
-      HashMap<Integer, List<Download>> mapping = new HashMap<>();
-      for (Download queuedDownload : queuedDownloads) {
-        String sessionId = getQueueSessionId(sessionIds, queuedDownload.getFacilityName());
-        String icatUrl = FacilityMap.getInstance().getIcatUrl(queuedDownload.getFacilityName());
-        IcatClient icatClient = new IcatClient(icatUrl, sessionId);
-        int priority = icatClient.getQueuePriority(queuedDownload.getUserName());
-        if (priority == 1) {
-          // Highest priority, prepare now
-          queuedDownload.setStatus(DownloadStatus.PREPARING);
-          prepareDownload(queuedDownload, null, sessionId);
-          return;
-        } else {
-          // Lower priority, add to mapping
-          mapping.putIfAbsent(priority, new ArrayList<>());
-          mapping.get(priority).add(queuedDownload);
-        }
-      }
-
-      // Get the highest priority encountered
-      List<Integer> keyList = new ArrayList<>();
-      for (Object key : mapping.keySet().toArray()) {
-        keyList.add((Integer) key);
-      }
-      int priority = Collections.min(keyList);
-
-      // Prepare the first Download at this priority level
-      List<Download> downloadList = mapping.get(priority);
-      Download download = downloadList.get(0);
-      download.setStatus(DownloadStatus.PREPARING);
-      prepareDownload(download, null, getQueueSessionId(sessionIds, download.getFacilityName()));
     }
+    Download queuedDownload = queuedDownloads.get(0);
+    queuedDownload.setStatus(DownloadStatus.PREPARING);
+    prepareDownload(queuedDownload, null, getQueueSessionId(sessionIds, queuedDownload.getFacilityName()));
   }
 
   private void handleException( Download download, String reason, boolean doExpire ) {
