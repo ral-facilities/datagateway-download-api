@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import org.icatproject.topcat.IdsClient;
 import org.icatproject.topcat.PriorityMap;
+import org.icatproject.topcat.DownloadBuilder;
 import org.icatproject.topcat.FacilityMap;
 import org.icatproject.topcat.IcatClient;
 import org.icatproject.topcat.Properties;
@@ -66,8 +67,6 @@ public class UserResource {
 
 	private String anonUserName;
 	private String defaultPlugin;
-	private long queueVisitMaxPartFileCount;
-	private long queueFilesMaxFileCount;
 
 	@PersistenceContext(unitName = "topcat")
 	EntityManager em;
@@ -76,8 +75,6 @@ public class UserResource {
 		Properties properties = Properties.getInstance();
 		this.anonUserName = properties.getProperty("anonUserName", "");
 		this.defaultPlugin = properties.getProperty("defaultPlugin", "simple");
-		this.queueVisitMaxPartFileCount = Long.valueOf(properties.getProperty("queue.visit.maxPartFileCount", "10000"));
-		this.queueFilesMaxFileCount = Long.valueOf(properties.getProperty("queue.files.maxFileCount", "10000"));
     }
 
 	/**
@@ -109,7 +106,7 @@ public class UserResource {
 		if (plugin == null) {
 			plugin = defaultPlugin;
 		}
-		String icatUrl = getIcatUrl(facilityName);
+		String icatUrl = DownloadBuilder.getIcatUrl(facilityName);
 		IcatClient icatClient = new IcatClient(icatUrl);
 		return icatClient.login(plugin, username, password);
 	}
@@ -168,7 +165,7 @@ public class UserResource {
 			@QueryParam("queryOffset") String queryOffset)
 			throws TopcatException, MalformedURLException, ParseException {
 
-		String icatUrl = getIcatUrl( facilityName );
+		String icatUrl = DownloadBuilder.getIcatUrl( facilityName );
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 
 		Map<String, Object> params = new HashMap<String, Object>();
@@ -206,7 +203,7 @@ public class UserResource {
 		if (downloadIds.size() == 0) {
 			throw new BadRequestException("At least one downloadId required");
 		}
-		String icatUrl = getIcatUrl(facilityName);
+		String icatUrl = DownloadBuilder.getIcatUrl(facilityName);
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 		String cartUserName = getCartUserName(icatClient.getUserName(), sessionId);
 		List<DownloadStatus> statuses = downloadRepository.getStatuses(cartUserName, downloadIds);
@@ -256,7 +253,7 @@ public class UserResource {
 			throw new NotFoundException("could not find download");
 		}
 
-		String icatUrl = getIcatUrl( facilityName );
+		String icatUrl = DownloadBuilder.getIcatUrl( facilityName );
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 
 		String userName = icatClient.getUserName();
@@ -313,7 +310,7 @@ public class UserResource {
             throw new NotFoundException("could not find download");
         }
 
-        String icatUrl = getIcatUrl( facilityName );
+        String icatUrl = DownloadBuilder.getIcatUrl( facilityName );
         IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 
 		String userName = icatClient.getUserName();
@@ -373,7 +370,7 @@ public class UserResource {
 	public Response getCart(@PathParam("facilityName") String facilityName, 
 			@QueryParam("sessionId") String sessionId) throws TopcatException, MalformedURLException, ParseException {
 
-        String icatUrl = getIcatUrl( facilityName );
+        String icatUrl = DownloadBuilder.getIcatUrl( facilityName );
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 
 		String userName = icatClient.getUserName();
@@ -447,7 +444,7 @@ public class UserResource {
 			return deleteCartResponse;
 		}
 
-		String icatUrl = getIcatUrl( facilityName );
+		String icatUrl = DownloadBuilder.getIcatUrl( facilityName );
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 
 		String userName = icatClient.getUserName();
@@ -619,7 +616,7 @@ public class UserResource {
 			@QueryParam("sessionId") String sessionId,
 			@QueryParam("items") String items) throws TopcatException, MalformedURLException, ParseException {
 
-		String icatUrl = getIcatUrl( facilityName );
+		String icatUrl = DownloadBuilder.getIcatUrl( facilityName );
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 
 		String userName = icatClient.getUserName();
@@ -729,9 +726,9 @@ public class UserResource {
 			throw new BadRequestException("fileName is required");
 		}
 
-		validateTransport(transport);
+		DownloadBuilder.validateTransport(transport);
 
-		String icatUrl = getIcatUrl( facilityName );
+		String icatUrl = DownloadBuilder.getIcatUrl( facilityName );
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 		String userName = icatClient.getUserName();
 		PriorityMap priorityMap = PriorityMap.getInstance();
@@ -819,6 +816,29 @@ public class UserResource {
 	}
 
 	/**
+	 * Set the final fields and persist multiple Download requests.
+	 * 
+	 * @param idsClient Client for the IDS to use for the Download
+	 * @param downloads Downloads to submit
+	 * @param fileName  Base fileName which will be extended for each individual Download
+	 * @return JsonArray of the new Download ids
+	 * @throws TopcatException if unable to submit one of the Downloads
+	 */
+	private JsonArray submitDownloads(IdsClient idsClient, List<Download> downloads, String fileName) throws TopcatException {
+		long downloadId;
+		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
+		int part = 1;
+		for (Download download : downloads) {
+			String partFilename = formatQueuedFilename(fileName, part, downloads.size());
+			download.setFileName(partFilename);
+			downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED);
+			jsonArrayBuilder.add(downloadId);
+			part += 1;
+		}
+		return jsonArrayBuilder.build();
+	}
+
+	/**
 	 * Set the final fields and persist a new Download request.
 	 * 
 	 * @param idsClient      Client for the IDS to use for the Download
@@ -875,82 +895,46 @@ public class UserResource {
 			@FormParam("fileName") String fileName, @FormParam("email") String email,
 			@FormParam("visitId") String visitId) throws TopcatException {
 
-		if (visitId == null || visitId.equals("")) {
-			throw new BadRequestException("visitId must be provided");
-		}
-		logger.info("queueVisitId called for {}", visitId);
-		validateTransport(transport);
+		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, email, fileName, transport, facilityName);
+		downloadBuilder.extractVisit(visitId);
 
-		facilityName = validateFacilityName(facilityName);
-		String icatUrl = getIcatUrl(facilityName);
-		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 		String transportUrl = getDownloadUrl(facilityName, transport);
 		IdsClient idsClient = new IdsClient(transportUrl);
+		JsonArray downloadIdArray = submitDownloads(idsClient, downloadBuilder.downloads, downloadBuilder.fileName);
+		return Response.ok(downloadIdArray).build();
+	}
 
-		// If we wanted to block the user, this is where we would do it
-		String userName = icatClient.getUserName();
-		String fullName = icatClient.getFullName();
-		icatClient.checkQueueAllowed(userName);
-		JsonArray datasets = icatClient.getDatasets(visitId);
-		if (datasets.size() == 0) {
-			throw new NotFoundException("No Datasets found for " + visitId);
-		}
+	/**
+	 * Queue an entire visit for download, split by Dataset into part Downloads if
+	 * needed.
+	 * 
+	 * @param facilityName ICAT Facility.name
+	 * @param sessionId    ICAT sessionId
+	 * @param transport    Transport mechanism to use
+	 * @param fileName     Optional name to use as the root for each individual part
+	 *                     Download. Defaults to facilityName_visitId.
+	 * @param email        Optional email to notify upon completion
+	 * @param visitId      ICAT Investigation.visitId to submit
+	 * @return Array of Download ids
+	 * @throws TopcatException
+	 */
+	@POST
+	@Path("/queue/dataCollection")
+	public Response queueDataCollection(@FormParam("facilityName") String facilityName,
+			@FormParam("sessionId") String sessionId, @FormParam("transport") String transport,
+			@FormParam("fileName") String fileName, @FormParam("email") String email,
+			@FormParam("dataCollectionId") Long dataCollectionId,
+			@FormParam("extractInvestigations") Boolean extractInvestigations,
+			@FormParam("extractDatasets") Boolean extractDatasets,
+			@FormParam("extractDatafiles") Boolean extractDatafiles) throws TopcatException {
 
-		long downloadId;
-		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
+		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, email, fileName, transport, facilityName);
+		downloadBuilder.extractDataCollection(dataCollectionId, extractInvestigations, extractDatasets, extractDatafiles);
 
-		long downloadFileCount = 0L;
-		long downloadFileSize = 0L;
-		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
-		List<Download> downloads = new ArrayList<Download>();
-		Download newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
-
-		for (JsonValue dataset : datasets) {
-			JsonArray datasetArray = dataset.asJsonArray();
-			long datasetId = datasetArray.getJsonNumber(0).longValueExact();
-			long datasetFileCount = datasetArray.getJsonNumber(1).longValueExact();
-			long datasetFileSize = datasetArray.getJsonNumber(2).longValueExact();
-			// Database triggers should set these, but check explicitly anyway
-			if (datasetFileCount < 1L) {
-				datasetFileCount = icatClient.getDatasetFileCount(datasetId);
-			}
-			if (datasetFileSize < 1L) {
-				datasetFileSize = icatClient.getDatasetFileSize(datasetId);
-			}
-
-			if (downloadFileCount > 0L && downloadFileCount + datasetFileCount > queueVisitMaxPartFileCount) {
-				newDownload.setDownloadItems(downloadItems);
-				newDownload.setSize(downloadFileSize);
-				downloads.add(newDownload);
-
-				downloadFileCount = 0L;
-				downloadFileSize = 0L;
-				downloadItems = new ArrayList<DownloadItem>();
-				newDownload = createDownload(sessionId, facilityName, "", userName, fullName, transport, email);
-			}
-
-			DownloadItem downloadItem = createDownloadItem(newDownload, datasetId, EntityType.dataset);
-			downloadItems.add(downloadItem);
-			downloadFileCount += datasetFileCount;
-			downloadFileSize += datasetFileSize;
-		}
-		newDownload.setDownloadItems(downloadItems);
-		newDownload.setSize(downloadFileSize);
-		downloads.add(newDownload);
-
-		int part = 1;
-		if (fileName == null) {
-			fileName = facilityName + "_" + visitId;
-		}
-		for (Download download : downloads) {
-			String partFilename = formatQueuedFilename(fileName, part, downloads.size());
-			download.setFileName(partFilename);
-			downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED);
-			jsonArrayBuilder.add(downloadId);
-			part += 1;
-		}
-
-		return Response.ok(jsonArrayBuilder.build()).build();
+		String transportUrl = getDownloadUrl(downloadBuilder.facilityName, downloadBuilder.transport);
+		IdsClient idsClient = new IdsClient(transportUrl);
+		JsonArray downloadIdArray = submitDownloads(idsClient, downloadBuilder.downloads, downloadBuilder.fileName);
+		return Response.ok(downloadIdArray).build();
 	}
 
 	/**
@@ -968,7 +952,7 @@ public class UserResource {
 
 		logger.info("queueAllowed called");
 
-		String icatUrl = getIcatUrl(facilityName);
+		String icatUrl = DownloadBuilder.getIcatUrl(facilityName);
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 		String userName = icatClient.getUserName();
 		int queuePriority = icatClient.getQueuePriority(userName);
@@ -998,43 +982,12 @@ public class UserResource {
 			@FormParam("fileName") String fileName, @FormParam("email") String email,
 			@FormParam("files") List<String> files) throws TopcatException, UnsupportedEncodingException {
 
-		if (files == null || files.size() == 0) {
-			throw new BadRequestException("At least one Datafile.location required");
-		} else if (files.size() > queueFilesMaxFileCount) {
-			throw new BadRequestException("Limit of " + queueFilesMaxFileCount + " files exceeded");
-		}
-		logger.info("queueFiles called for {} files", files.size());
-		validateTransport(transport);
-		facilityName = validateFacilityName(facilityName);
-		if (fileName == null) {
-			fileName = facilityName + "_files";
-		}
+		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, email, fileName, transport, facilityName);
+		DatafilesResponse response = downloadBuilder.extractLocations(files);
 
-		String icatUrl = getIcatUrl(facilityName);
-		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 		String transportUrl = getDownloadUrl(facilityName, transport);
 		IdsClient idsClient = new IdsClient(transportUrl);
-
-		String userName = icatClient.getUserName();
-		String fullName = icatClient.getFullName();
-		icatClient.checkQueueAllowed(userName);
-
-		DatafilesResponse response = icatClient.getDatafiles(files);
-		if (response.ids.size() == 0) {
-			throw new NotFoundException("No Datafiles found");
-		}
-
-		List<DownloadItem> downloadItems = new ArrayList<>();
-		Download download = createDownload(sessionId, facilityName, fileName, userName, fullName, transport, email);
-		for (long datafileId : response.ids) {
-			DownloadItem downloadItem = createDownloadItem(download, datafileId, EntityType.datafile);
-			downloadItems.add(downloadItem);
-		}
-		download.setDownloadItems(downloadItems);
-		download.setSize(response.totalSize);
-
-		long downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED);
-
+		long downloadId = submitDownload(idsClient, downloadBuilder.downloads.get(0), DownloadStatus.QUEUED);
 		JsonObjectBuilder jsonObjectBuilder = Json.createObjectBuilder();
 		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
 		for (String missingFile : response.missing) {
@@ -1069,18 +1022,6 @@ public class UserResource {
 		filenameBuilder.append("_of_");
 		filenameBuilder.append(sizeString);
 		return filenameBuilder.toString();
-	}
-
-	/**
-	 * Validate that the submitted transport mechanism is not null or empty.
-	 * 
-	 * @param transport Transport mechanism to use
-	 * @throws BadRequestException if null or empty
-	 */
-	private static void validateTransport(String transport) throws BadRequestException {
-		if (transport == null || transport.trim().isEmpty()) {
-			throw new BadRequestException("transport is required");
-		}
 	}
 
 	/**
@@ -1179,22 +1120,6 @@ public class UserResource {
 
 	private Response emptyCart(String facilityName, String userName) {
 		return emptyCart(facilityName, userName, null);
-	}
-
-	private String validateFacilityName(String facilityName) throws BadRequestException {
-		try {
-			return FacilityMap.getInstance().validateFacilityName(facilityName);
-		} catch (InternalException ie){
-			throw new BadRequestException( ie.getMessage() );
-		}
-	}
-	
-	private String getIcatUrl( String facilityName ) throws BadRequestException{
-		try {
-			return FacilityMap.getInstance().getIcatUrl(facilityName);
-		} catch (InternalException ie){
-			throw new BadRequestException( ie.getMessage() );
-		}
 	}
 
 	private String getIdsUrl( String facilityName ) throws BadRequestException{

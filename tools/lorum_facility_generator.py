@@ -185,7 +185,28 @@ for i in range(0, proposals_count):
 						"dataset":  {"id":  dataset_id}
 					}
 				})
-			write(datafile_entities)
+			datafile_ids = write(datafile_entities)
+
+
+data_collection_id = write([{"DataCollection": {}}])[0]
+data_collection_investigation = {
+	"dataCollection": {"id": data_collection_id},
+	"investigation": {"id": investigation_id},
+}
+data_collection_dataset = {
+	"dataCollection": {"id": data_collection_id},
+	"dataset": {"id": dataset_id},
+}
+data_collection_datafile = {
+	"dataCollection": {"id": data_collection_id},
+	"datafile": {"id": datafile_ids[-1]},
+}
+entities = [
+	{"DataCollectionInvestigation": data_collection_investigation},
+	{"DataCollectionDataset": data_collection_dataset},
+	{"DataCollectionDatafile": data_collection_datafile},
+]
+write(entities)
 
 
 # root_user_id = write([
