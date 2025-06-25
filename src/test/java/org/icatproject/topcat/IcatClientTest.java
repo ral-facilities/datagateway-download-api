@@ -1,25 +1,38 @@
 package org.icatproject.topcat;
 
-import java.util.*;
-import java.lang.reflect.*;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import static org.junit.Assert.*;
-import org.junit.*;
-
-import jakarta.json.*;
-import jakarta.json.JsonValue.ValueType;
 import jakarta.ejb.EJB;
+import jakarta.json.Json;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonArrayBuilder;
+import jakarta.json.JsonObject;
+import jakarta.json.JsonObjectBuilder;
+import jakarta.json.JsonValue;
+import jakarta.json.JsonValue.ValueType;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.httpclient.Response;
-import org.icatproject.topcat.domain.*;
 import org.icatproject.topcat.exceptions.TopcatException;
-
-import java.net.URLEncoder;
-
 import org.icatproject.topcat.repository.CacheRepository;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
 
 public class IcatClientTest {
 
@@ -30,12 +43,12 @@ public class IcatClientTest {
 
 	private Connection connection;
 
-	@BeforeClass
+	@BeforeAll
 	public static void beforeAll() {
 		TestHelpers.installTrustManager();
 	}
 
-	@Before
+	@BeforeEach
 	public void setup() throws Exception {
 		HttpClient httpClient = new HttpClient("https://localhost:8181/icat");
 		String data = "json=" + URLEncoder.encode(

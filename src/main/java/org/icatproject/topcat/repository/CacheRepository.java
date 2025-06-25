@@ -27,7 +27,7 @@ public class CacheRepository {
 	@PersistenceContext(unitName = "topcat")
 	EntityManager em;
 
-	private static final Logger logger = LoggerFactory.getLogger(ConfVarRepository.class);
+	private static final Logger logger = LoggerFactory.getLogger(CacheRepository.class);
 
 	public Object get(String key, Long seconds){
 		Cache cache = getCache(key);
@@ -80,27 +80,32 @@ public class CacheRepository {
 
 	@Schedule(hour="*", minute="0")
 	public void prune(){
-		Properties properties = Properties.getInstance();
-      	Integer maxCacheSize = Integer.valueOf(properties.getProperty("maxCacheSize", "10000"));
+		try {
+			Properties properties = Properties.getInstance();
+			Integer maxCacheSize = Integer.valueOf(properties.getProperty("maxCacheSize", "10000"));
 
-		TypedQuery<Cache> query = em.createQuery("select cache from Cache cache order by cache.lastAccessTime desc", Cache.class);
-		query.setMaxResults(maxCacheSize);
+			TypedQuery<Cache> query = em.createQuery("select cache from Cache cache order by cache.lastAccessTime desc", Cache.class);
+			query.setMaxResults(maxCacheSize);
 
-		List<Cache> caches;
-		int page = 1;
-		while(true){
-			query.setFirstResult(maxCacheSize * page);
-			caches = query.getResultList();
-			if(caches.size() > 0){
-				for(Cache cache : caches){
-					em.remove(cache);
+			List<Cache> caches;
+			int page = 1;
+			while(true){
+				query.setFirstResult(maxCacheSize * page);
+				caches = query.getResultList();
+				if(caches.size() > 0){
+					for(Cache cache : caches){
+						em.remove(cache);
+					}
+				} else {
+					break;
 				}
-			} else {
-				break;
 			}
-		}
 
-		em.flush();
+			em.flush();
+		} catch (RuntimeException e) {
+			// Catch exceptions to prevent the EJBTimerService from crashing
+			logger.error("Unhandled exception in prune()", e);
+		}
 	}
 
 	private Cache getCache(String key){
