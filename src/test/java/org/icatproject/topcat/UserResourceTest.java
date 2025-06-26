@@ -111,6 +111,11 @@ public class UserResourceTest {
 	}
 
 	@Test
+	public void testLoginFailure() throws Exception {
+		assertThrows(ForbiddenException.class, () -> userResource.login(null, "root", "guess", null));
+	}
+
+	@Test
 	public void testGetSize() throws Exception {
 		String facilityName = "LILS";
 		String entityType = "investigation";
