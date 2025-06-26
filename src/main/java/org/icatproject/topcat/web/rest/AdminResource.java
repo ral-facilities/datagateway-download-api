@@ -8,9 +8,11 @@ import java.util.Map;
 import java.util.Date;
 import java.text.ParseException;
 
+import jakarta.annotation.Resource;
 import jakarta.ejb.EJB;
 import jakarta.ejb.LocalBean;
 import jakarta.ejb.Stateless;
+import jakarta.mail.Session;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.PUT;
@@ -59,6 +61,9 @@ public class AdminResource {
 
 	@EJB
 	private CacheRepository cacheRepository;
+
+    @Resource(name = "mail/topcat")
+    private Session mailSession;
 
     /**
      * Returns whether or not the session provided has admin access - i.e. can use this "v1/admin/* api."
@@ -148,6 +153,8 @@ public class AdminResource {
      * @param id the download id in the database.
      *
      * @param value the status value i.e. 'ONLINE', 'ARCHIVE' or 'RESTORING'.
+     *
+     * @param customDownloadUrl Optional value to use in the email response body
      * 
      * @return an empty Response
      *
@@ -164,7 +171,8 @@ public class AdminResource {
         @PathParam("id") Long id,
         @FormParam("facilityName") String facilityName,
         @FormParam("sessionId") String sessionId,
-        @FormParam("value") String value)
+        @FormParam("value") String value,
+        @FormParam("customDownloadUrl") String customDownloadUrl)
         throws TopcatException, MalformedURLException, ParseException {
 
         String icatUrl = getIcatUrl( facilityName );
@@ -184,6 +192,10 @@ public class AdminResource {
         }
         if(value.equals("COMPLETE")){
             download.setCompletedAt(new Date());
+            if (customDownloadUrl != null && !customDownloadUrl.equals("")) {
+                download.setIsEmailSent(true);
+                StatusCheck.sendDownloadReadyEmail(mailSession, download, customDownloadUrl);
+            }
         }
 
         downloadRepository.save(download);
