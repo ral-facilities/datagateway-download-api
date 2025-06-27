@@ -743,7 +743,6 @@ public class UserResource {
 		logger.info("submitCart: get cart for user: " + cartUserName + ", facility: " + facilityName + "...");
 
 		Cart cart = cartRepository.getCart(cartUserName, facilityName);
-		System.out.println(cart.getCartItems().size());
 		String fullName = icatClient.getFullName();
 		Long downloadId = null;
 		String transportUrl = getDownloadUrl(facilityName, transport);
@@ -756,7 +755,6 @@ public class UserResource {
 
 		if (cart != null) {
 			em.refresh(cart);
-			System.out.println(cart.getCartItems().size());
 			FacilityMap facilityMap = FacilityMap.getInstance();
 			Long countLimit = facilityMap.getCountLimit(facilityName);
 			Long sizeLimit = facilityMap.getSizeLimit(facilityName);
@@ -765,7 +763,6 @@ public class UserResource {
 				List<Long> datasetIds = new ArrayList<>();
 				List<Long> datafileIds = new ArrayList<>();
 				for (CartItem cartItem : cart.getCartItems()) {
-					System.out.println(cartItem);
 					switch (cartItem.getEntityType()) {
 						case investigation:
 							investigationIds.add(cartItem.getEntityId());
@@ -781,18 +778,12 @@ public class UserResource {
 					}
 				}
 				IcatClient.EntityCounter entityCounter = icatClient.new EntityCounter(investigationIds, datasetIds, datafileIds);
-				System.out.println("totalCount: " + entityCounter.totalCount);
-				System.out.println("totalSize : " + entityCounter.totalSize);
 				if (countLimit != null && entityCounter.totalCount > countLimit) {
 					throw new BadRequestException("Unable to submit for cart for download, number of files exceeds limit");
 				}
 				if (sizeLimit != null && entityCounter.totalSize > sizeLimit) {
 					throw new BadRequestException("Unable to submit for cart for download, size of files exceeds limit");
 				}
-				System.out.println(cart.getCartItems());
-				System.out.println(datasetIds);
-				System.out.println(entityCounter.totalCount);
-				System.out.println(entityCounter.totalSize);
 			}
 			Download download = createDownload(sessionId, cart.getFacilityName(), fileName, cart.getUserName(),
 					fullName, transport, email);
