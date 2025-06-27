@@ -8,6 +8,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class FacilityMap {
+    public static class Facility {
+		public String icatUrl;
+        public String idsUrl;
+		public Long countLimit = null;
+		public Long sizeLimit = null;
+    }
 	
     private static FacilityMap instance = null;
 
@@ -21,8 +27,7 @@ public class FacilityMap {
 	private Logger logger = LoggerFactory.getLogger(FacilityMap.class);
 	
 	private Properties properties;
-	private Map<String,String> facilityIcatUrl;
-	private Map<String,String> facilityIdsUrl;
+	private Map<String, Facility> facilityMapping = new HashMap<>();
 	
 	public FacilityMap() throws InternalException{
 		// The "normal" case: use the Topcat Properties instance (that reads run.properties)
@@ -32,9 +37,6 @@ public class FacilityMap {
 	public FacilityMap(Properties injectedProperties) throws InternalException{
 		
 		// This allows us to inject a mock Properties instance for testing
-		
-		facilityIcatUrl = new HashMap<String,String>();
-		facilityIdsUrl = new HashMap<String,String>();
 		
 		properties = injectedProperties;
 		
@@ -48,26 +50,40 @@ public class FacilityMap {
 			throw new InternalException("Property facility.list is not defined.");
 		}
 		
-		for( String facility : facilities ){
-			logger.info("FacilityMap: looking for properties for facility '" + facility + "'...");
-			String icatUrl = properties.getProperty("facility." + facility + ".icatUrl","");
+		for( String facilityName : facilities ){
+			logger.info("FacilityMap: looking for properties for facility '" + facilityName + "'...");
+			Facility facility = new Facility();
+			String icatUrl = properties.getProperty("facility." + facilityName + ".icatUrl","");
 			// Complain/log if property is not set
 			if( icatUrl.length() == 0 ){
-				String error = "FacilityMap: property facility." + facility + ".icatUrl is not defined.";
+				String error = "FacilityMap: property facility." + facilityName + ".icatUrl is not defined.";
 				logger.error( error );
 				throw new InternalException( error );
 			}
-			logger.info("FacilityMap: icatUrl for facility '" + facility + "' is '" + icatUrl + "'");
-			facilityIcatUrl.put( facility,  icatUrl );
-			String idsUrl = properties.getProperty("facility." + facility + ".idsUrl","");
+			logger.info("FacilityMap: icatUrl for facility '" + facilityName + "' is '" + icatUrl + "'");
+			facility.icatUrl = icatUrl;
+
+			String idsUrl = properties.getProperty("facility." + facilityName + ".idsUrl","");
 			// Complain/log if property is not set
 			if( idsUrl.length() == 0 ){
-				String error = "FacilityMap: property facility." + facility + ".idsUrl is not defined.";
+				String error = "FacilityMap: property facility." + facilityName + ".idsUrl is not defined.";
 				logger.error( error );
 				throw new InternalException( error );
 			}
-			logger.info("FacilityMap: idsUrl for facility '" + facility + "' is '" + idsUrl + "'");
-			facilityIdsUrl.put( facility,  idsUrl );
+			logger.info("FacilityMap: idsUrl for facility '" + facilityName + "' is '" + idsUrl + "'");
+			facility.idsUrl = idsUrl;
+
+			String countString = properties.getProperty("facility." + facilityName + ".limit.count");
+			if (countString != null) {
+				facility.countLimit = Long.valueOf(countString);
+			}
+
+			String sizeString = properties.getProperty("facility." + facilityName + ".limit.size");
+			if (sizeString != null) {
+				facility.sizeLimit = Long.valueOf(sizeString);
+			}
+
+			facilityMapping.put(facilityName, facility);
 		}
 	}
 
@@ -84,26 +100,14 @@ public class FacilityMap {
 		return facility;
 	}
 	
-	public String getIcatUrl( String facility ) throws InternalException{
-		facility = validateFacilityName(facility);
-		String url = facilityIcatUrl.get( facility );
-		if( url == null ){
-			String error = "FacilityMap.getIcatUrl: unknown facility: " + facility;
-			logger.error( error );
-			throw new InternalException( error );
-		}
-		return url;
+	public String getIcatUrl(String facilityName) throws InternalException {
+		Facility facility = getFacility(facilityName);
+		return facility.icatUrl;
 	}
 
-	public String getIdsUrl( String facility ) throws InternalException{
-		facility = validateFacilityName(facility);
-		String url = facilityIdsUrl.get( facility );
-		if( url == null ){
-			String error = "FacilityMap.getIdsUrl: unknown facility: " + facility;
-			logger.error( error );
-			throw new InternalException( error );
-		}
-		return url;
+	public String getIdsUrl(String facilityName) throws InternalException {
+		Facility facility = getFacility(facilityName);
+		return facility.idsUrl;
 	}
 	
 	public String getDownloadUrl( String facility, String downloadType ) throws InternalException{
@@ -118,5 +122,41 @@ public class FacilityMap {
 			url = this.getIdsUrl(facility);
 		}
 		return url;
+	}
+
+	/**
+	 * @param facilityName ICAT Facility.name
+	 * @return Limit on the number of Datafiles allowed in a cart, or null if not limit set
+	 * @throws InternalException if facilityName is not a key in facilityMapping
+	 */
+	public Long getCountLimit(String facilityName) throws InternalException {
+		Facility facility = getFacility(facilityName);
+		return facility.countLimit;
+	}
+
+	/**
+	 * @param facilityName ICAT Facility.name
+	 * @return Limit on the total size of Datafiles allowed in a cart, or null if not limit set
+	 * @throws InternalException if facilityName is not a key in facilityMapping
+	 */
+	public Long getSizeLimit(String facilityName) throws InternalException {
+		Facility facility = getFacility(facilityName);
+		return facility.sizeLimit;
+	}
+
+	/**
+	 * @param facilityName ICAT Facility.name
+	 * @return Facility config object with the given name
+	 * @throws InternalException if facilityName is not a key in facilityMapping
+	 */
+	private Facility getFacility(String facilityName) throws InternalException {
+		facilityName = validateFacilityName(facilityName);
+		Facility facility = facilityMapping.get(facilityName);
+		if (facility == null) {
+			String error = "FacilityMap.getFacility: unknown facility: " + facility;
+			logger.error(error);
+			throw new InternalException(error);
+		}
+		return facility;
 	}
 }

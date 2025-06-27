@@ -11,9 +11,12 @@ import java.util.UUID;
 
 import jakarta.ejb.EJB;
 import jakarta.inject.Inject;
+import jakarta.json.Json;
 import jakarta.json.JsonArray;
+import jakarta.json.JsonArrayBuilder;
 import jakarta.json.JsonNumber;
 import jakarta.json.JsonObject;
+import jakarta.json.JsonObjectBuilder;
 import jakarta.ws.rs.core.Response;
 
 import org.jboss.arquillian.container.test.api.Deployment;
@@ -283,6 +286,86 @@ public class UserResourceTest {
 
 		newDownload = findDownload(downloads, downloadId);
 		assertTrue(newDownload.getIsDeleted());
+	}
+
+	private void submitCartFailure(String entityType, String field) throws Exception {
+		String facilityName = "LILS";
+		HttpClient httpClient = new HttpClient("https://localhost:8181/icat");
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		JsonObject jsonObject = icatClient.getEntity(entityType);
+		long entityId = jsonObject.getJsonNumber("id").longValueExact();
+		String cartItemString = entityType.toLowerCase() + " " + entityId;
+
+		if (field != null) {
+			JsonObjectBuilder fieldBuilder = Json.createObjectBuilder();
+			JsonObjectBuilder entityBuilder = Json.createObjectBuilder();
+			JsonArrayBuilder entitiesBuilder = Json.createArrayBuilder();
+
+			fieldBuilder.add("id", entityId);
+			fieldBuilder.add(field, 1);
+			entityBuilder.add(entityType, fieldBuilder);
+			entitiesBuilder.add(entityBuilder);
+
+			String data = "sessionId=" + sessionId + "&entities=" + entitiesBuilder.build();
+			httpClient.post("entityManager", new HashMap<>(), data);
+		}
+		try {
+			Response cartItems = userResource.addCartItems(facilityName, sessionId, cartItemString, false);
+			Executable runnable = () -> userResource.submitCart(facilityName, sessionId, "http", "", "fileName", null);
+			assertThrows(BadRequestException.class, runnable);
+		} finally {
+			userResource.deleteCartItems(facilityName, sessionId, cartItemString);
+
+			if (field != null) {
+				JsonArrayBuilder entitiesBuilder = Json.createArrayBuilder();
+				JsonObjectBuilder fieldBuilder = Json.createObjectBuilder();
+				JsonObjectBuilder entityBuilder = Json.createObjectBuilder();
+
+				fieldBuilder.add("id", entityId);
+				fieldBuilder.add(field, 0);
+				entityBuilder.add(entityType, fieldBuilder);
+				entitiesBuilder.add(entityBuilder);
+
+				String data = "sessionId=" + sessionId + "&entities=" + entitiesBuilder.build();
+				httpClient.post("entityManager", new HashMap<>(), data);
+			}
+		}
+	}
+
+	@Test
+	public void testSubmitCartInvestigationCountFailure() throws Exception {
+		System.out.println("DEBUG testSubmitCartInvestigationCountFailure");
+		submitCartFailure("Investigation", "fileCount");
+	}
+
+	@Test
+	public void testSubmitCartInvestigationSizeFailure() throws Exception {
+		System.out.println("DEBUG testSubmitCartInvestigationSizeFailure");
+		submitCartFailure("Investigation", "fileSize");
+	}
+
+	@Test
+	public void testSubmitCartDatasetCountFailure() throws Exception {
+		System.out.println("DEBUG testSubmitCartDatasetCountFailure");
+		submitCartFailure("Dataset", "fileCount");
+	}
+
+	@Test
+	public void testSubmitCartDatasetSizeFailure() throws Exception {
+		System.out.println("DEBUG testSubmitCartDatasetSizeFailure");
+		submitCartFailure("Dataset", "fileSize");
+	}
+
+	@Test
+	public void testSubmitCartDatafileCountFailure() throws Exception {
+		System.out.println("DEBUG testSubmitCartDatafileCountFailure");
+		submitCartFailure("Datafile", null);
+	}
+
+	@Test
+	public void testSubmitCartDatafileSizeFailure() throws Exception {
+		System.out.println("DEBUG testSubmitCartDatafileSizeFailure");
+		submitCartFailure("Datafile", "fileSize");
 	}
 
 	@Test

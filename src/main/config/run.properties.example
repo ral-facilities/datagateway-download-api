@@ -25,6 +25,9 @@ facility.LILS.downloadType.http = http://localhost:8080
 facility.YFH.downloadType.https = https://your.facility.downloadIdsUrl.here
 facility.YFH.downloadType.globus = https://your.facility.globusUrl.here
 
+facility.LILS.limit.count = 250000
+facility.LILS.limit.size = 10000000000000
+
 # enable send email
 mail.enable=true
 
