@@ -103,7 +103,12 @@ public class UserResourceTest {
 	@Test
 	public void testLogin() throws Exception {
 		String loginResponseString = userResource.login(null, "root", "pw", null);
-		JsonObject loginResponseObject = Utils.parseJsonObject(loginResponseString);
+		JsonObject loginResponseObject = null;
+		try {
+			loginResponseObject = Utils.parseJsonObject(loginResponseString);
+		} catch (Exception e) {
+			fail("Unable to parse: " + loginResponseString);
+		}
 
 		assertEquals(1, loginResponseObject.keySet().size(), loginResponseObject.toString());
 		assertTrue(loginResponseObject.containsKey("sessionId"));
@@ -509,12 +514,20 @@ public class UserResourceTest {
 	@Test
 	public void testGetDownloadTypeStatuses() throws Exception {
 		System.out.println("DEBUG testGetDownloadTypeStatuses");
+		Long httpTypeId = null;
 		Long globusTypeId = null;
 		Long lilsTypeId = null;
 		try {
 			// The run.properties used for tests defines the configuration for http, globus, and lils.
-			// However, only http will have a persisted entry due to AdminResourceTest.testSetDownloadTypeStatus
-			// Therefore, create the other two to test their config settings are handled correctly
+			// First we need to persist the corresponding entities.
+			DownloadType httpType = new DownloadType();
+			httpType.setFacilityName("LILS");
+			httpType.setDownloadType("http");
+			httpType.setDisabled(false);
+			httpType.setMessage("");
+			downloadTypeRepository.save(httpType);
+			httpTypeId = httpType.getId();
+
 			DownloadType globusType = new DownloadType();
 			globusType.setFacilityName("LILS");
 			globusType.setDownloadType("globus");
@@ -542,7 +555,7 @@ public class UserResourceTest {
 			JsonObject httpObject = json.getJsonObject("http");
 			assertNotNull(httpObject, "Keys were: " + json.keySet());
 			assertFalse(httpObject.getBoolean("disabled"));
-			assertEquals("Disabled for testing", httpObject.getString("message"));
+			assertEquals("", httpObject.getString("message"));
 			assertEquals("https://localhost:8181", httpObject.getString("idsUrl"));
 			assertEquals("HTTP", httpObject.getString("displayName"));
 			assertEquals("Example description for HTTP access method.", httpObject.getString("description"));
@@ -560,6 +573,7 @@ public class UserResourceTest {
 			assertFalse(json.containsKey("lils"));
 		} finally {
 			// Remove the entries we created to avoid interference with other tests
+			downloadTypeRepository.remove(httpTypeId);
 			downloadTypeRepository.remove(globusTypeId);
 			downloadTypeRepository.remove(lilsTypeId);
 		}
