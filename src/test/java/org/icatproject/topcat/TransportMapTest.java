@@ -49,7 +49,6 @@ public class TransportMapTest {
 
         String data = "sessionId=" + sessionId + "&entities=" + arrayBuilder.build();
         Response response = httpClient.post("entityManager", new HashMap<>(), data);
-        System.out.println(response);
         JsonArray responseArray = Utils.parseJsonArray(response.toString());
         long userId = responseArray.getJsonNumber(0).longValueExact();
         long groupingId = responseArray.getJsonNumber(1).longValueExact();
@@ -86,7 +85,6 @@ public class TransportMapTest {
 			arrayBuilder.add(groupingBuilder);
 
 			response = httpClient.delete("entityManager?sessionId=" + sessionId + "&entities=" + arrayBuilder.build(), new HashMap<>());
-            System.out.println(response);
         }
 
         // globus mechanism not allowed for specific prefixes

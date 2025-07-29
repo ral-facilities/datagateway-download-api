@@ -176,7 +176,7 @@ public class PriorityMap {
     }
 
     /**
-     * @return The priority which applies to any use without a specific setting.
+     * @return The priority which applies to any user without a specific setting.
      */
     public int getDefaultPriority() {
         return defaultPriority;

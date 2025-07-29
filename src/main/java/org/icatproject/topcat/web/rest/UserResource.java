@@ -1191,8 +1191,7 @@ public class UserResource {
 	 *            <code>0d9a3706-80d4-4d29-9ff3-4d65d4308a24</code>
 	 *
 	 * @return JSON object with disabled (boolean) and message (string) fields; and if
-	 *         and if defined in the config the idsUrl, displayName and description
-	 *         (String)
+	 *         defined in the config the idsUrl, displayName and description (String)
 	 * 
 	 * @throws TopcatException
 	 */

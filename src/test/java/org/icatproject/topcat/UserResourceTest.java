@@ -512,11 +512,14 @@ public class UserResourceTest {
 		Long globusTypeId = null;
 		Long lilsTypeId = null;
 		try {
+			// The run.properties used for tests defines the configuration for http, globus, and lils.
+			// However, only http will have a persisted entry due to AdminResourceTest.testSetDownloadTypeStatus
+			// Therefore, create the other two to test their config settings are handled correctly
 			DownloadType globusType = new DownloadType();
 			globusType.setFacilityName("LILS");
 			globusType.setDownloadType("globus");
 			globusType.setDisabled(false);
-			globusType.setMessage("Disabled for testing");
+			globusType.setMessage("");
 			downloadTypeRepository.save(globusType);
 			globusTypeId = globusType.getId();
 
@@ -524,7 +527,7 @@ public class UserResourceTest {
 			lilsType.setFacilityName("LILS");
 			lilsType.setDownloadType("lils");
 			lilsType.setDisabled(false);
-			lilsType.setMessage("Disabled for testing");
+			lilsType.setMessage("");
 			downloadTypeRepository.save(lilsType);
 			lilsTypeId = lilsType.getId();
 
@@ -534,6 +537,8 @@ public class UserResourceTest {
 
 			JsonObject json = Utils.parseJsonObject(response.getEntity().toString());
 
+			// http SHOULD appear as it is not configured to have any authz conditions
+			// assert that its fields are set according to AdminResourceTest.testSetDownloadTypeStatus
 			JsonObject httpObject = json.getJsonObject("http");
 			assertNotNull(httpObject, "Keys were: " + json.keySet());
 			assertFalse(httpObject.getBoolean("disabled"));
@@ -542,14 +547,19 @@ public class UserResourceTest {
 			assertEquals("HTTP", httpObject.getString("displayName"));
 			assertEquals("Example description for HTTP access method.", httpObject.getString("description"));
 
+			// globus SHOULD appear as it is configured to exclude ldap, db authenticators but we're using simple
 			JsonObject globusObject = json.getJsonObject("globus");
 			assertNotNull(globusObject, "Keys were: " + json.keySet());
 			assertFalse(globusObject.getBoolean("disabled"));
-			assertEquals("Disabled for testing", globusObject.getString("message"));
+			assertEquals("", globusObject.getString("message"));
 			assertEquals("https://localhost:8181", globusObject.getString("idsUrl"));
 			assertEquals("Globus", globusObject.getString("displayName"));
 			assertEquals("Example description for Globus access method.", globusObject.getString("description"));
+
+			// lils SHOULD NOT appear as it is only allowed for a specific Grouping that our user is not a member of
+			assertFalse(json.containsKey("lils"));
 		} finally {
+			// Remove the entries we created to avoid interference with other tests
 			downloadTypeRepository.remove(globusTypeId);
 			downloadTypeRepository.remove(lilsTypeId);
 		}
