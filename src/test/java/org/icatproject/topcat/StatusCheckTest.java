@@ -562,7 +562,7 @@ public class StatusCheckTest {
 
 			// Create a single-tier download; initial status should be COMPLETE
 			Download dummyDownload = TestHelpers.createDummyDownload("DummyUserName", preparedId, transport, false,
-					status, false, downloadRepository);
+					status, 0, false, downloadRepository);
 			downloadId = dummyDownload.getId();
 
 			// Not testing delays, so set to zero
@@ -764,28 +764,44 @@ public class StatusCheckTest {
 		System.out.println("DEBUG testStartQueuedDownloadNegative");
 		Long downloadId1 = null;
 		Long downloadId2 = null;
+		Long downloadId3 = null;
+		Long downloadId4 = null;
 		try {
 			String transport = "http";
 			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.QUEUED, false, downloadRepository);
+					DownloadStatus.QUEUED, 2, false, downloadRepository);
 			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.QUEUED, false, downloadRepository);
+					DownloadStatus.QUEUED, 1, false, downloadRepository);
+			Download dummyDownload3 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
+					DownloadStatus.QUEUED, 2, false, downloadRepository);
+			Download dummyDownload4 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
+					DownloadStatus.QUEUED, 1, false, downloadRepository);
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
+			downloadId3 = dummyDownload3.getId();
+			downloadId4 = dummyDownload4.getId();
 
 			statusCheck.startQueuedDownload(-1);
 
 			Download postDownload1 = TestHelpers.getDummyDownload(downloadId1, downloadRepository);
 			Download postDownload2 = TestHelpers.getDummyDownload(downloadId2, downloadRepository);
+			Download postDownload3 = TestHelpers.getDummyDownload(downloadId3, downloadRepository);
+			Download postDownload4 = TestHelpers.getDummyDownload(downloadId4, downloadRepository);
 
-			assertEquals(DownloadStatus.RESTORING, postDownload1.getStatus());
-			assertNotNull(postDownload1.getPreparedId());
-			assertEquals(DownloadStatus.QUEUED, postDownload2.getStatus());
-			assertNull(postDownload2.getPreparedId());
+			assertEquals(DownloadStatus.QUEUED, postDownload1.getStatus());
+			assertEquals(DownloadStatus.RESTORING, postDownload2.getStatus());
+			assertEquals(DownloadStatus.QUEUED, postDownload3.getStatus());
+			assertEquals(DownloadStatus.QUEUED, postDownload4.getStatus());
+			assertNull(postDownload1.getPreparedId());
+			assertNotNull(postDownload2.getPreparedId());
+			assertNull(postDownload3.getPreparedId());
+			assertNull(postDownload4.getPreparedId());
 		} finally {
 			// clean up
 			TestHelpers.deleteDummyDownload(downloadId1, downloadRepository);
 			TestHelpers.deleteDummyDownload(downloadId2, downloadRepository);
+			TestHelpers.deleteDummyDownload(downloadId3, downloadRepository);
+			TestHelpers.deleteDummyDownload(downloadId4, downloadRepository);
 		}
 	}
 
@@ -796,7 +812,7 @@ public class StatusCheckTest {
 		try {
 			String transport = "http";
 			Download dummyDownload = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.QUEUED, false, downloadRepository);
+					DownloadStatus.QUEUED, 1, false, downloadRepository);
 			downloadId = dummyDownload.getId();
 
 			statusCheck.startQueuedDownload(0);
@@ -822,9 +838,9 @@ public class StatusCheckTest {
 		try {
 			String transport = "http";
 			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.QUEUED, false, downloadRepository);
+					DownloadStatus.QUEUED, 1, false, downloadRepository);
 			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.QUEUED, false, downloadRepository);
+					DownloadStatus.QUEUED, 1, false, downloadRepository);
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
@@ -852,9 +868,9 @@ public class StatusCheckTest {
 		try {
 			String transport = "http";
 			Download dummyDownload1 = TestHelpers.createDummyDownload("DummyUserName", "preparedId", transport, true,
-					DownloadStatus.RESTORING, false, downloadRepository);
+					DownloadStatus.RESTORING, 0, false, downloadRepository);
 			Download dummyDownload2 = TestHelpers.createDummyDownload("DummyUserName", null, transport, true,
-					DownloadStatus.QUEUED, false, downloadRepository);
+					DownloadStatus.QUEUED, 1, false, downloadRepository);
 			downloadId1 = dummyDownload1.getId();
 			downloadId2 = dummyDownload2.getId();
 
@@ -880,10 +896,10 @@ public class StatusCheckTest {
 	private Download createDummyDownload(String preparedId, String transport, Boolean isTwoLevel, Boolean isDeleted) {
 		if (isTwoLevel) {
 			return TestHelpers.createDummyDownload("DummyUserName", preparedId, transport, isTwoLevel,
-					DownloadStatus.PREPARING, isDeleted, downloadRepository);
+					DownloadStatus.PREPARING, 0, isDeleted, downloadRepository);
 		} else {
 			return TestHelpers.createDummyDownload("DummyUserName", preparedId, transport, isTwoLevel,
-					DownloadStatus.COMPLETE, isDeleted, downloadRepository);
+					DownloadStatus.COMPLETE, 0, isDeleted, downloadRepository);
 		}
 	}
 }
