@@ -59,7 +59,7 @@ public class TestHelpers {
     }
 
     public static Download createDummyDownload(String userName, String preparedId, String transport, Boolean isTwoLevel,
-			DownloadStatus downloadStatus, Boolean isDeleted, DownloadRepository downloadRepository) {
+			DownloadStatus downloadStatus, int priority, Boolean isDeleted, DownloadRepository downloadRepository) {
 
 		// This mocks what UserResource.submitCart() might do.
 
@@ -86,14 +86,9 @@ public class TestHelpers {
 
 		List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
 		download.setDownloadItems(downloadItems);
-
 		download.setIsTwoLevel(isTwoLevel);
-
-		if (isTwoLevel) {
-			download.setStatus(downloadStatus);
-		} else {
-			download.setStatus(downloadStatus);
-		}
+		download.setStatus(downloadStatus);
+		download.setPriority(priority);
 
 		return downloadRepository.save(download);
     }

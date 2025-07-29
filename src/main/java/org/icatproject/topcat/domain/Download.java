@@ -73,6 +73,9 @@ public class Download implements Serializable {
     @Enumerated(EnumType.STRING)
     private DownloadStatus status;
 
+    @Column(name = "PRIORITY")
+    private Integer priority;
+
     @Column(name = "THE_SIZE")
     private long size;
 
@@ -186,6 +189,14 @@ public class Download implements Serializable {
 
     public void setStatus(DownloadStatus status) {
         this.status = status;
+    }
+
+    public int getPriority() {
+        return priority;
+    }
+
+    public void setPriority(int priority) {
+        this.priority = priority;
     }
 
     public long getSize() {

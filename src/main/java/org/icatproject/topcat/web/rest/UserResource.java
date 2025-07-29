@@ -766,7 +766,7 @@ public class UserResource {
 				downloadItems.add(downloadItem);
 			}
 			download.setDownloadItems(downloadItems);
-			downloadId = submitDownload(idsClient, download, DownloadStatus.PREPARING);
+			downloadId = submitDownload(idsClient, download, DownloadStatus.PREPARING, 0);
 			try {
 				em.remove(cart);
 				em.flush();
@@ -828,11 +828,14 @@ public class UserResource {
 	 * @param idsClient      Client for the IDS to use for the Download
 	 * @param download       Download to submit
 	 * @param downloadStatus Initial DownloadStatus to set if and only if the IDS isTwoLevel
+	 * @param priority		 Priority to submit the Download with
 	 * @return Id of the new Download
 	 * @throws TopcatException
 	 */
-	private long submitDownload(IdsClient idsClient, Download download, DownloadStatus downloadStatus)
+	private long submitDownload(IdsClient idsClient, Download download, DownloadStatus downloadStatus, int priority)
 			throws TopcatException {
+
+		download.setPriority(priority);
 		Boolean isTwoLevel = idsClient.isTwoLevel();
 		download.setIsTwoLevel(isTwoLevel);
 
@@ -894,7 +897,8 @@ public class UserResource {
 		// If we wanted to block the user, this is where we would do it
 		String userName = icatClient.getUserName();
 		String fullName = icatClient.getFullName();
-		icatClient.checkQueueAllowed(userName);
+		int priority = icatClient.getQueuePriority(userName);
+		icatClient.checkQueueAllowed(priority);
 		TransportMap transportMap = TransportMap.getInstance();
 		transportMap.checkAllowed(facilityName, transport, userName, icatClient);
 		JsonArray datasets = icatClient.getDatasets(visitId);
@@ -951,7 +955,7 @@ public class UserResource {
 		for (Download download : downloads) {
 			String partFilename = formatQueuedFilename(fileName, part, downloads.size());
 			download.setFileName(partFilename);
-			downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED);
+			downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED, priority);
 			jsonArrayBuilder.add(downloadId);
 			part += 1;
 		}
@@ -1023,7 +1027,8 @@ public class UserResource {
 
 		String userName = icatClient.getUserName();
 		String fullName = icatClient.getFullName();
-		icatClient.checkQueueAllowed(userName);
+		int priority = icatClient.getQueuePriority(userName);
+		icatClient.checkQueueAllowed(priority);
 		TransportMap transportMap = TransportMap.getInstance();
 		transportMap.checkAllowed(facilityName, transport, userName, icatClient);
 
@@ -1041,7 +1046,7 @@ public class UserResource {
 		download.setDownloadItems(downloadItems);
 		download.setSize(response.totalSize);
 
-		long downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED);
+		long downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED, priority);
 
 		JsonObjectBuilder jsonObjectBuilder = Json.createObjectBuilder();
 		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
