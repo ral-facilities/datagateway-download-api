@@ -85,7 +85,7 @@ public class IcatClient {
 		 */
 		private void processIds(List<Long> ids, String queryPrefix) throws UnsupportedEncodingException, TopcatException {
 			if (!ids.isEmpty()) {
-				int chunkLimit = getUrlLimit - minimumQuerySize - URLEncoder.encode(queryPrefix, "UTF8").length() - 3;  // 3 is the size of closing ) when encoded as %29
+				int chunkLimit = getUrlLimit - minimumQuerySize - URLEncoder.encode(queryPrefix, "UTF8").length() - parenthesisSize;
 				ListIterator<Long> iterator = ids.listIterator();
 				Long id = iterator.next();
 				String chunkedIds = id.toString();
@@ -94,13 +94,13 @@ public class IcatClient {
 					id = iterator.next();
 					String idString = id.toString();
 					int encodedIdLength = URLEncoder.encode(idString, "UTF8").length();
-					if (chunkSize + 3 + encodedIdLength > chunkLimit) {  // 3 is size of , when encoded as %2C
+					if (chunkSize + commaSize + encodedIdLength > chunkLimit) {
 						submitIdsChunk(queryPrefix, chunkedIds);
 						chunkedIds = idString;
 						chunkSize = encodedIdLength;
 					} else {
 						chunkedIds += "," + idString;
-						chunkSize += 3 + encodedIdLength;  // 3 is size of , when encoded as %2C
+						chunkSize += commaSize + encodedIdLength;
 					}
 				}
 				submitIdsChunk(queryPrefix, chunkedIds);
@@ -137,6 +137,24 @@ public class IcatClient {
 	private String sessionId;
 
 	private static final int minimumQuerySize = "entityManager?sessionId=&query=".length() + 36;  // sessionIds are 36 characters
+	private static final int commaSize;
+	private static final int parenthesisSize;
+
+	static {
+		int parenthesisSizeNonFinal = 3;
+		try {
+			parenthesisSizeNonFinal = URLEncoder.encode(")", "UTF8").length();
+		} catch (UnsupportedEncodingException e) {} finally{
+			parenthesisSize = parenthesisSizeNonFinal;
+		}
+
+		int commaSizeNonFinal = 3;
+		try {
+			commaSizeNonFinal = URLEncoder.encode(",", "UTF8").length();
+		} catch (UnsupportedEncodingException e) {} finally{
+			commaSize = commaSizeNonFinal;
+		}
+	}
 
 	public IcatClient(String url) {
 		this.httpClient = new HttpClient(url + "/icat");
@@ -288,7 +306,7 @@ public class IcatClient {
 			file = iterator.next();
 			String quotedFile = "'" + file + "'";
 			int encodedFileLength = URLEncoder.encode(quotedFile, "UTF8").length();
-			if (chunkSize + 3 + encodedFileLength > chunkLimit) {  // 3 is size of , when encoded as %2C
+			if (chunkSize + commaSize + encodedFileLength > chunkLimit) {
 				response.submitDatafilesQuery(queryPrefix + chunkedFiles + querySuffix);
 
 				chunkedFiles = quotedFile;
@@ -296,7 +314,7 @@ public class IcatClient {
 				response.missing.add(file);
 			} else {
 				chunkedFiles += "," + quotedFile;
-				chunkSize += 3 + encodedFileLength;  // 3 is size of , when encoded as %2C
+				chunkSize += commaSize + encodedFileLength;
 				response.missing.add(file);
 			}
 		}
