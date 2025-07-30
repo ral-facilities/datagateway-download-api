@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -170,7 +171,7 @@ public class AdminResourceTest {
 				downloadStatus = "PAUSED";
 			}
 	
-			response = adminResource.setDownloadStatus(testDownload.getId(), facilityName, adminSessionId, downloadStatus);
+			response = adminResource.setDownloadStatus(testDownload.getId(), facilityName, adminSessionId, downloadStatus, null);
 			assertEquals(200, response.getStatus());
 	
 			// and test that the new status has been set
@@ -215,7 +216,7 @@ public class AdminResourceTest {
 	
 			try {
 				response = adminResource.setDownloadStatus(testDownload.getId(), facilityName, nonAdminSessionId,
-						downloadStatus);
+						downloadStatus, null);
 				// We should not see the following
 				System.out.println("DEBUG: AdminRT.setDownloadStatus response: " + response.getStatus() + ", "
 						+ (String) response.getEntity());
@@ -254,7 +255,7 @@ public class AdminResourceTest {
 			downloadRepository.save(testDownload);
 			downloadId = testDownload.getId();
 
-			Response response = adminResource.setDownloadStatus(downloadId, facilityName, adminSessionId, DownloadStatus.RESTORING.toString());
+			Response response = adminResource.setDownloadStatus(downloadId, facilityName, adminSessionId, DownloadStatus.RESTORING.toString(), null);
 			assertEquals(200, response.getStatus());
 
 			response = adminResource.getDownloads(facilityName, adminSessionId, null);
@@ -263,6 +264,74 @@ public class AdminResourceTest {
 
 			testDownload = findDownload(downloads, downloadId);
 			assertEquals(DownloadStatus.PREPARING, testDownload.getStatus());
+		} finally {
+			if (downloadId != null) {
+				downloadRepository.removeDownload(downloadId);
+			}
+		}
+	}
+
+	@Test
+	public void testSetDownloadStatusNoCustomDownloadUrl() throws Exception {
+		Long downloadId = null;
+		try {
+			Download testDownload = new Download();
+			String facilityName = "LILS";
+			testDownload.setFacilityName(facilityName);
+			testDownload.setSessionId(adminSessionId);
+			testDownload.setStatus(DownloadStatus.QUEUED);
+			testDownload.setIsDeleted(false);
+			testDownload.setUserName("simple/root");
+			testDownload.setFileName("testFile.txt");
+			testDownload.setTransport("http");
+			downloadRepository.save(testDownload);
+			downloadId = testDownload.getId();
+
+			Response response = adminResource.setDownloadStatus(downloadId, facilityName, adminSessionId,
+				DownloadStatus.COMPLETE.toString(), null);
+			assertEquals(200, response.getStatus());
+
+			response = adminResource.getDownloads(facilityName, adminSessionId, null);
+			assertEquals(200, response.getStatus());
+			List<Download> downloads = (List<Download>) response.getEntity();
+
+			testDownload = findDownload(downloads, downloadId);
+			assertEquals(DownloadStatus.COMPLETE, testDownload.getStatus());
+			assertFalse(testDownload.getIsEmailSent());
+		} finally {
+			if (downloadId != null) {
+				downloadRepository.removeDownload(downloadId);
+			}
+		}
+	}
+
+	@Test
+	public void testSetDownloadStatusCustomDownloadUrl() throws Exception {
+		Long downloadId = null;
+		try {
+			Download testDownload = new Download();
+			String facilityName = "LILS";
+			testDownload.setFacilityName(facilityName);
+			testDownload.setSessionId(adminSessionId);
+			testDownload.setStatus(DownloadStatus.QUEUED);
+			testDownload.setIsDeleted(false);
+			testDownload.setUserName("simple/root");
+			testDownload.setFileName("testFile.txt");
+			testDownload.setTransport("http");
+			downloadRepository.save(testDownload);
+			downloadId = testDownload.getId();
+
+			Response response = adminResource.setDownloadStatus(downloadId, facilityName, adminSessionId,
+				DownloadStatus.COMPLETE.toString(), "customDownloadUrl");
+			assertEquals(200, response.getStatus());
+
+			response = adminResource.getDownloads(facilityName, adminSessionId, null);
+			assertEquals(200, response.getStatus());
+			List<Download> downloads = (List<Download>) response.getEntity();
+
+			testDownload = findDownload(downloads, downloadId);
+			assertEquals(DownloadStatus.COMPLETE, testDownload.getStatus());
+			assertTrue(testDownload.getIsEmailSent());
 		} finally {
 			if (downloadId != null) {
 				downloadRepository.removeDownload(downloadId);

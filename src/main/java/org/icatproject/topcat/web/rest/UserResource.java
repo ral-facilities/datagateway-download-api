@@ -731,6 +731,7 @@ public class UserResource {
 		}
 
 		validateTransport(transport);
+		email = validateEmail(transport, email);
 
 		String icatUrl = getIcatUrl( facilityName );
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
@@ -746,11 +747,6 @@ public class UserResource {
 		Long downloadId = null;
 		String transportUrl = getDownloadUrl(facilityName, transport);
 		IdsClient idsClient = new IdsClient(transportUrl);
-
-		if(email != null && email.equals("")){
-			email = null;
-		}
-
 
 		if (cart != null) {
 			em.refresh(cart);
@@ -884,6 +880,7 @@ public class UserResource {
 		}
 		logger.info("queueVisitId called for {}", visitId);
 		validateTransport(transport);
+		email = validateEmail(transport, email);
 
 		facilityName = validateFacilityName(facilityName);
 		String icatUrl = getIcatUrl(facilityName);
@@ -1010,6 +1007,7 @@ public class UserResource {
 		}
 		logger.info("queueFiles called for {} files", files.size());
 		validateTransport(transport);
+		email = validateEmail(transport, email);
 		facilityName = validateFacilityName(facilityName);
 		if (fileName == null) {
 			fileName = facilityName + "_files";
@@ -1087,6 +1085,27 @@ public class UserResource {
 		if (transport == null || transport.trim().isEmpty()) {
 			throw new BadRequestException("transport is required");
 		}
+	}
+
+	/**
+	 * Validate that the submitted email is not null or empty if mail.required is true.
+	 * 
+	 * @param transport Transport mechanism to use (which may require email)
+	 * @param email Users email address, which may be null or empty
+	 * @return The original email, or null if it was an empty string
+	 * @throws BadRequestException if email null or empty and mail.required is true
+	 */
+	private static String validateEmail(String transport, String email) throws BadRequestException {
+		if(email != null && email.equals("")){
+			email = null;
+		}
+
+		String emailRequired = Properties.getInstance().getProperty("mail.required." + transport, "false");
+		if (Boolean.parseBoolean(emailRequired) && email == null) {
+			throw new BadRequestException("email is required for " + transport);
+		}
+
+		return email;
 	}
 
 	/**

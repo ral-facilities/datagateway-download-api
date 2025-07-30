@@ -319,7 +319,7 @@ public class UserResourceTest {
 				assertEquals(transport, download.getTransport());
 				assertEquals("simple/root", download.getUserName());
 				assertEquals("simple/root", download.getFullName());
-				assertEquals("", download.getEmail());
+				assertEquals(null, download.getEmail());
 				assertNotEquals(0L, download.getSize());
 				part += 1;
 			}
@@ -389,7 +389,7 @@ public class UserResourceTest {
 			assertEquals(transport, download.getTransport());
 			assertEquals("simple/root", download.getUserName());
 			assertEquals("simple/root", download.getFullName());
-			assertEquals("", download.getEmail());
+			assertEquals(null, download.getEmail());
 			assertNotEquals(0L, download.getSize());
 		} finally {
 			if (downloadId != null) {
@@ -547,6 +547,38 @@ public class UserResourceTest {
 				TestHelpers.deleteDummyDownload(downloadId, downloadRepository);
 			});
 		}
+	}
+
+	@Test
+	public void testRequiredEmail() throws Exception {
+		String facilityName = "LILS";
+		Response response;
+		List<Download> downloads;
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		JsonObject dataset = icatClient.getEntity("dataset");
+		long entityId = dataset.getInt("id");
+
+		// Get the initial state of the downloads - may not be empty
+		response = userResource.getDownloads(facilityName, sessionId, null);
+		assertEquals(200, response.getStatus());
+
+		downloads = (List<Download>) response.getEntity();
+		int initialDownloadsSize = downloads.size();
+
+		// TEST logging
+		System.out.println("DEBUG testSubmitCart: initial downloads size: " + initialDownloadsSize);
+
+		// Put something into the Cart, so we have something to submit
+		response = userResource.addCartItems(facilityName, sessionId, "dataset " + entityId, false);
+		assertEquals(200, response.getStatus());
+
+		// Now submit it
+		String transport = "ada";
+		String email = "";
+		String fileName = "dataset-1.zip";
+		String zipType = "ZIP";
+		assertThrows(BadRequestException.class,
+			() -> userResource.submitCart(facilityName, sessionId, transport, email, fileName, zipType));
 	}
 
 	private int getCartSize(Response response) throws Exception {
