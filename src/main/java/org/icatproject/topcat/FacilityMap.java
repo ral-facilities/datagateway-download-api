@@ -2,6 +2,7 @@ package org.icatproject.topcat;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.icatproject.topcat.exceptions.InternalException;
 import org.slf4j.Logger;
@@ -83,7 +84,14 @@ public class FacilityMap {
 		}
 		return facility;
 	}
-	
+
+	/**
+	 * @return All the ICAT Facility.names from the config file
+	 */
+	public Set<String> getFacilities() {
+		return facilityIcatUrl.keySet();
+	}
+
 	public String getIcatUrl( String facility ) throws InternalException{
 		facility = validateFacilityName(facility);
 		String url = facilityIcatUrl.get( facility );

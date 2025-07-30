@@ -455,7 +455,7 @@ public class IcatClient {
 		if (userPriority != null) {
 			return userPriority;
 		}
-		HashMap<Integer, String> mapping = priorityMap.getMapping();
+		HashMap<Integer, String> mapping = priorityMap.getQueryMapping();
 		List<Integer> keyList = new ArrayList<>(mapping.keySet());
 		Collections.sort(keyList);
 		for (Integer priority : keyList) {
@@ -464,13 +464,7 @@ public class IcatClient {
 			}
 		}
 
-		String anonUserName = Properties.getInstance().getProperty("anonUserName");
-		if (anonUserName == null || !userName.startsWith(anonUserName)) {
-			// The anonymous cart username will end with the user's sessionId so cannot do .equals
-			return priorityMap.getAuthenticatedPriority();
-		} else {
-			return priorityMap.getDefaultPriority();
-		}
+		return priorityMap.getAuthenticatedPriority(userName);
 	}
 
 	/**
@@ -487,8 +481,28 @@ public class IcatClient {
 		return results.size();
 	}
 
+	/**
+	 * @param userName  ICAT User.name
+	 * @param groupings ICAT Grouping.names
+	 * @return whether userName is in any of the named groupings
+	 * @throws TopcatException if the query fails
+	 */
+	public boolean isInGroups(String userName, Set<String> groupings) throws TopcatException {
+		String query = "SELECT userGroup FROM UserGroup userGroup WHERE userGroup.user.name = :user";
+		query += " AND userGroup.grouping.name IN ('" + String.join("','", groupings) + "')";
+		JsonArray results = submitQuery(query);
+		return results.size() > 0;
+	}
+
 	protected String[] getAdminUserNames() throws Exception {
 		return Properties.getInstance().getProperty("adminUserNames", "").split("([ ]*,[ ]*|[ ]+)");
+	}
+
+	/**
+	 * @param sessionId ICAT sessionId
+	 */
+	public void setSessionId(String sessionId) {
+		this.sessionId = sessionId;
 	}
 
 }

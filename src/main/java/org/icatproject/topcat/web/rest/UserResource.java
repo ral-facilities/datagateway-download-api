@@ -42,7 +42,9 @@ import org.icatproject.topcat.PriorityMap;
 import org.icatproject.topcat.FacilityMap;
 import org.icatproject.topcat.IcatClient;
 import org.icatproject.topcat.Properties;
+import org.icatproject.topcat.TransportMap;
 import org.icatproject.topcat.IcatClient.DatafilesResponse;
+import org.icatproject.topcat.TransportMap.TransportMechanism;
 
 @Stateless
 @LocalBean
@@ -738,6 +740,8 @@ public class UserResource {
 		String userName = icatClient.getUserName();
 		PriorityMap priorityMap = PriorityMap.getInstance();
 		priorityMap.checkAnonDownloadEnabled(userName);
+		TransportMap transportMap = TransportMap.getInstance();
+		transportMap.checkAllowed(facilityName, transport, userName, icatClient);
 		String cartUserName = getCartUserName(userName, sessionId);
 
 		logger.info("submitCart: get cart for user: " + cartUserName + ", facility: " + facilityName + "...");
@@ -893,6 +897,8 @@ public class UserResource {
 		String fullName = icatClient.getFullName();
 		int priority = icatClient.getQueuePriority(userName);
 		icatClient.checkQueueAllowed(priority);
+		TransportMap transportMap = TransportMap.getInstance();
+		transportMap.checkAllowed(facilityName, transport, userName, icatClient);
 		JsonArray datasets = icatClient.getDatasets(visitId);
 		if (datasets.size() == 0) {
 			throw new NotFoundException("No Datasets found for " + visitId);
@@ -1022,6 +1028,8 @@ public class UserResource {
 		String fullName = icatClient.getFullName();
 		int priority = icatClient.getQueuePriority(userName);
 		icatClient.checkQueueAllowed(priority);
+		TransportMap transportMap = TransportMap.getInstance();
+		transportMap.checkAllowed(facilityName, transport, userName, icatClient);
 
 		DatafilesResponse response = icatClient.getDatafiles(files);
 		if (response.ids.size() == 0) {
@@ -1149,6 +1157,51 @@ public class UserResource {
 	}
 
 	/**
+	 * Get details of all DownloadTypes the user (identified by sessionId) is allowed
+	 * to use.
+	 * 
+	 * @param facilityName ICAT Facility.name
+	 * @param sessionId    ICAT sessionId
+	 * @return JsonObject with all visible DownloadTypes as keys, and an inner
+	 *         JsonObject with "disabled", "message", "idsUrl", "displayName" and
+	 *         "description" as keys.
+	 * @throws TopcatException if provided values are not recognised, or queries fail
+	*/
+	@GET
+	@Path("/downloadType/status")
+	@Produces({MediaType.APPLICATION_JSON})
+	public Response getDownloadTypeStatuses(@QueryParam("facilityName") String facilityName,
+			@QueryParam("sessionId") String sessionId) throws TopcatException {
+
+		facilityName = validateFacilityName(facilityName);
+
+		String icatUrl = getIcatUrl(facilityName);
+		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
+		String userName = icatClient.getUserName();
+		TransportMap transportMap = TransportMap.getInstance();
+
+		JsonObjectBuilder responseJson = Json.createObjectBuilder();
+		List<DownloadType> downloadTypes = downloadTypeRepository.getDownloadTypes(facilityName);
+		for (DownloadType downloadType : downloadTypes) {
+			String downloadTypeName = downloadType.getDownloadType();
+			if (transportMap.isAllowed(facilityName, downloadTypeName, userName, icatClient)) {
+				JsonObjectBuilder downloadTypeBuilder = Json.createObjectBuilder();
+				downloadTypeBuilder.add("disabled", downloadType.getDisabled());
+				downloadTypeBuilder.add("message", downloadType.getMessage());
+				TransportMechanism transportMechanism = transportMap.getTransportMechanism(facilityName, downloadTypeName);
+				if (transportMechanism != null) {
+					downloadTypeBuilder.add("idsUrl", transportMechanism.idsUrl);
+					downloadTypeBuilder.add("displayName", transportMechanism.displayName);
+					downloadTypeBuilder.add("description", transportMechanism.description);
+				}
+				responseJson.add(downloadTypeName, downloadTypeBuilder);
+			}
+		}
+
+		return Response.ok().entity(responseJson.build().toString()).build();
+	}
+
+	/**
 	 * Query the enabled/disabled status of a download type. The default status is enabled.
 	 * 
 	 * @summary getDownloadTypeStatus
@@ -1162,7 +1215,8 @@ public class UserResource {
 	 *            a valid session id which takes the form
 	 *            <code>0d9a3706-80d4-4d29-9ff3-4d65d4308a24</code>
 	 *
-	 * @return JSON object with disabled (boolean) and message (string) fields
+	 * @return JSON object with disabled (boolean) and message (string) fields; and if
+	 *         defined in the config the idsUrl, displayName and description (String)
 	 * 
 	 * @throws TopcatException
 	 */
@@ -1174,7 +1228,14 @@ public class UserResource {
 			@QueryParam("facilityName") String facilityName,
 			@QueryParam("sessionId") String sessionId)
 					throws TopcatException {
-		  
+
+		facilityName = validateFacilityName(facilityName);
+		String icatUrl = getIcatUrl(facilityName);
+		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
+		String userName = icatClient.getUserName();
+		TransportMap transportMap = TransportMap.getInstance();
+		transportMap.checkAllowed(facilityName, type, userName, icatClient);
+
 		Boolean disabled = false;
 		String message = "";
 		DownloadType downloadType = downloadTypeRepository.getDownloadType(facilityName, type);
@@ -1187,6 +1248,13 @@ public class UserResource {
 		JsonObjectBuilder responseJson = Json.createObjectBuilder()
 				.add("disabled", disabled)
 				.add("message", message);
+
+		TransportMechanism transportMechanism = transportMap.getTransportMechanism(facilityName, type);
+		if (transportMechanism != null) {
+			responseJson.add("idsUrl", transportMechanism.idsUrl);
+			responseJson.add("displayName", transportMechanism.displayName);
+			responseJson.add("description", transportMechanism.description);
+		}
 
 		return Response.ok().entity(responseJson.build().toString()).build();
 	}

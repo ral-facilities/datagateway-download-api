@@ -40,6 +40,7 @@ import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.domain.Cart;
 import org.icatproject.topcat.domain.Download;
 import org.icatproject.topcat.domain.DownloadStatus;
+import org.icatproject.topcat.domain.DownloadType;
 import org.icatproject.topcat.exceptions.BadRequestException;
 import org.icatproject.topcat.exceptions.ForbiddenException;
 import org.icatproject.topcat.exceptions.NotFoundException;
@@ -102,7 +103,12 @@ public class UserResourceTest {
 	@Test
 	public void testLogin() throws Exception {
 		String loginResponseString = userResource.login(null, "root", "pw", null);
-		JsonObject loginResponseObject = Utils.parseJsonObject(loginResponseString);
+		JsonObject loginResponseObject = null;
+		try {
+			loginResponseObject = Utils.parseJsonObject(loginResponseString);
+		} catch (Exception e) {
+			fail("Unable to parse: " + loginResponseString);
+		}
 
 		assertEquals(1, loginResponseObject.keySet().size(), loginResponseObject.toString());
 		assertTrue(loginResponseObject.containsKey("sessionId"));
@@ -482,6 +488,7 @@ public class UserResourceTest {
 
 	@Test
 	public void testGetDownloadTypeStatus() throws Exception {
+		System.out.println("DEBUG testGetDownloadTypeStatus");
 
 		String facilityName = "LILS";
 		String downloadType = "http";
@@ -494,6 +501,9 @@ public class UserResourceTest {
 		json = Utils.parseJsonObject(response.getEntity().toString());
 		assertTrue(json.containsKey("disabled"));
 		assertTrue(json.containsKey("message"));
+		assertEquals("https://localhost:8181", json.getString("idsUrl"));
+		assertEquals("HTTP", json.getString("displayName"));
+		assertEquals("Example description for HTTP access method.", json.getString("description"));
 
 		// There's not much we can assume about the actual status;
 		// but should test that the fields contain the correct types
@@ -503,6 +513,74 @@ public class UserResourceTest {
 			String message = json.getString("message");
 		} catch (Exception e) {
 			fail("One or both fields are not of the correct type: " + e.getMessage());
+		}
+	}
+
+	@Test
+	public void testGetDownloadTypeStatuses() throws Exception {
+		System.out.println("DEBUG testGetDownloadTypeStatuses");
+		Long httpTypeId = null;
+		Long globusTypeId = null;
+		Long lilsTypeId = null;
+		try {
+			// The run.properties used for tests defines the configuration for http, globus, and lils.
+			// First we need to persist the corresponding entities.
+			DownloadType httpType = new DownloadType();
+			httpType.setFacilityName("LILS");
+			httpType.setDownloadType("http");
+			httpType.setDisabled(false);
+			httpType.setMessage("");
+			downloadTypeRepository.save(httpType);
+			httpTypeId = httpType.getId();
+
+			DownloadType globusType = new DownloadType();
+			globusType.setFacilityName("LILS");
+			globusType.setDownloadType("globus");
+			globusType.setDisabled(false);
+			globusType.setMessage("");
+			downloadTypeRepository.save(globusType);
+			globusTypeId = globusType.getId();
+
+			DownloadType lilsType = new DownloadType();
+			lilsType.setFacilityName("LILS");
+			lilsType.setDownloadType("lils");
+			lilsType.setDisabled(false);
+			lilsType.setMessage("");
+			downloadTypeRepository.save(lilsType);
+			lilsTypeId = lilsType.getId();
+
+			String facilityName = "LILS";
+			Response response = userResource.getDownloadTypeStatuses(facilityName, sessionId);
+			assertEquals(200, response.getStatus());
+
+			JsonObject json = Utils.parseJsonObject(response.getEntity().toString());
+
+			// http SHOULD appear as it is not configured to have any authz conditions
+			// assert that its fields are set according to AdminResourceTest.testSetDownloadTypeStatus
+			JsonObject httpObject = json.getJsonObject("http");
+			assertNotNull(httpObject, "Keys were: " + json.keySet());
+			assertFalse(httpObject.getBoolean("disabled"));
+			assertEquals("", httpObject.getString("message"));
+			assertEquals("https://localhost:8181", httpObject.getString("idsUrl"));
+			assertEquals("HTTP", httpObject.getString("displayName"));
+			assertEquals("Example description for HTTP access method.", httpObject.getString("description"));
+
+			// globus SHOULD appear as it is configured to exclude ldap, db authenticators but we're using simple
+			JsonObject globusObject = json.getJsonObject("globus");
+			assertNotNull(globusObject, "Keys were: " + json.keySet());
+			assertFalse(globusObject.getBoolean("disabled"));
+			assertEquals("", globusObject.getString("message"));
+			assertEquals("https://localhost:8181", globusObject.getString("idsUrl"));
+			assertEquals("Globus", globusObject.getString("displayName"));
+			assertEquals("Example description for Globus access method.", globusObject.getString("description"));
+
+			// lils SHOULD NOT appear as it is only allowed for a specific Grouping that our user is not a member of
+			assertFalse(json.containsKey("lils"));
+		} finally {
+			// Remove the entries we created to avoid interference with other tests
+			downloadTypeRepository.remove(httpTypeId);
+			downloadTypeRepository.remove(globusTypeId);
+			downloadTypeRepository.remove(lilsTypeId);
 		}
 	}
 

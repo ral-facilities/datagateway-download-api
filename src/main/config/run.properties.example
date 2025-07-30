@@ -22,8 +22,19 @@ facility.YFH.idsUrl = https://your.facility.idsUrl.here
 # If the property is not defined, Topcat will use the facility's idsUrl by default.
 
 facility.LILS.downloadType.http = http://localhost:8080
+facility.LILS.downloadType.list = http
+facility.LILS.downloadType.http.displayName = HTTP
+facility.LILS.downloadType.http.description = Example description for HTTP access method.
+
+facility.YFH.downloadType.list = https globus
 facility.YFH.downloadType.https = https://your.facility.downloadIdsUrl.here
+facility.YFH.downloadType.https.displayName = HTTPS
+facility.YFH.downloadType.https.description = Example description for HTTPS access method.
+facility.YFH.downloadType.https.disallowedAuthn = simple db
 facility.YFH.downloadType.globus = https://your.facility.globusUrl.here
+facility.YFH.downloadType.globus.displayName = Globus
+facility.YFH.downloadType.globus.description = Example description for Globus access method.
+facility.YFH.downloadType.globus.allowedGroupings = principal_beamline_scientists admins
 
 # enable send email
 mail.enable=true
@@ -136,8 +147,8 @@ queue.priority.instrumentScientist.instruments = {"ABC": 1}
 queue.priority.instrumentScientist.default = 2
 queue.priority.investigationUser.roles = {"ABC": 3}
 queue.priority.investigationUser.default = 4
-queue.priority.authenticated = 5
-queue.priority.default = 0
+queue.priority.authenticated = {"orcid": 6, "anon": 0}
+queue.priority.default = 5
 
 # Configurable limit for the length of the GET URL for requesting Datafiles by a list of file locations
 # The exact limit may depend on the server

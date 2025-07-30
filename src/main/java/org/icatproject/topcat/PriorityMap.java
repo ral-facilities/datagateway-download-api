@@ -26,9 +26,9 @@ public class PriorityMap {
     String anonUserName;
     boolean anonDownloadEnabled;
     private int defaultPriority;
-    private int authenticatedPriority;
+    private HashMap<String, Integer> authenticatedMapping = new HashMap<>();
     private HashMap<String, Integer> userMapping = new HashMap<>();
-    private HashMap<Integer, String> mapping = new HashMap<>();
+    private HashMap<Integer, String> queryMapping = new HashMap<>();
     private Logger logger = LoggerFactory.getLogger(PriorityMap.class);
 
     public PriorityMap() {
@@ -40,32 +40,22 @@ public class PriorityMap {
                     + "authenticated priority will be used as default level");
         }
         anonDownloadEnabled = Boolean.parseBoolean(properties.getProperty("anonDownloadEnabled", "true"));
-        String defaultString;
-        if (anonDownloadEnabled) {
-            defaultString = properties.getProperty("queue.priority.default", "0");
-            defaultPriority = Integer.valueOf(defaultString);
-        } else {
-            defaultString = "0";
-            defaultPriority = 0;
-        }
+        String defaultString = properties.getProperty("queue.priority.default", "0");
+        defaultPriority = Integer.valueOf(defaultString);
 
-        String authenticatedString = properties.getProperty("queue.priority.authenticated", defaultString);
-        setAuthenticatedPriority(authenticatedString);
+
+        String authenticatedString = properties.getProperty("queue.priority.authenticated", "{}");
+        parseObject(authenticatedString, authenticatedMapping);
 
         String userString = properties.getProperty("queue.priority.user", "{}");
-        JsonReader reader = Json.createReader(new ByteArrayInputStream(userString.getBytes()));
-        JsonObject object = reader.readObject();
-        for (String key : object.keySet()) {
-            int priority = object.getInt(key);
-            userMapping.put(key, priority);
-        }
+        parseObject(userString, userMapping);
 
         String property = "queue.priority.investigationUser.default";
-        String investigationUserString = properties.getProperty(property, authenticatedString);
+        String investigationUserString = properties.getProperty(property, defaultString);
         updateMapping(Integer.valueOf(investigationUserString), "user.investigationUsers IS NOT EMPTY");
 
         property = "queue.priority.instrumentScientist.default";
-        String instrumentScientistString = properties.getProperty(property, authenticatedString);
+        String instrumentScientistString = properties.getProperty(property, defaultString);
         updateMapping(Integer.valueOf(instrumentScientistString), "user.instrumentScientists IS NOT EMPTY");
 
         String investigationUserProperty = properties.getProperty("queue.priority.investigationUser.roles");
@@ -93,25 +83,18 @@ public class PriorityMap {
     }
 
     /**
-     * Set the minimum priority for all authenticated Users. This cannot be lower
-     * than the defaultPriority, which will be used instead if this is the case.
+     * Extracts a String key to priority level mapping for any criteria (user, authn).
      * 
-     * @param authenticatedString The value read from the run.properties file
+     * @param propertyString String representing a JsonObject from the run.properties
+     *                       file, or {}
+     * @param mapping        HashMap from String key to numeric priority level
      */
-    private void setAuthenticatedPriority(String authenticatedString) {
-        authenticatedPriority = Integer.valueOf(authenticatedString);
-        if (authenticatedPriority < 1 && defaultPriority >= 1) {
-            String msg = "queue.priority.authenticated disabled with value " + authenticatedString;
-            msg += " but queue.priority.default enabled with value " + defaultPriority;
-            msg += "\nAuthenticated users will use default priority if no superseding priority applies";
-            logger.warn(msg);
-            authenticatedPriority = defaultPriority;
-        } else if (authenticatedPriority >= 1 && authenticatedPriority > defaultPriority) {
-            String msg = "queue.priority.authenticated enabled with value " + authenticatedString;
-            msg += " but queue.priority.default supersedes with value " + defaultPriority;
-            msg += "\nAuthenticated users will use default priority if no superseding priority applies";
-            logger.warn(msg);
-            authenticatedPriority = defaultPriority;
+    private void parseObject(String propertyString, HashMap<String, Integer> mapping) {
+        JsonReader reader = Json.createReader(new ByteArrayInputStream(propertyString.getBytes()));
+        JsonObject object = reader.readObject();
+        for (String key : object.keySet()) {
+            int priority = object.getInt(key);
+            mapping.put(key, priority);
         }
     }
 
@@ -147,16 +130,16 @@ public class PriorityMap {
         if (priority < 1) {
             logger.warn("Non-positive priority found in mapping, ignoring entry");
             return;
-        } else if (authenticatedPriority >= 1 && priority >= authenticatedPriority) {
-            logger.warn("Priority set in mapping would be superseded by queue.priority.authenticated, ignoring entry");
+        } else if (defaultPriority >= 1 && priority >= defaultPriority) {
+            logger.warn("Priority set in mapping would be superseded by queue.priority.default, ignoring entry");
             return;
         }
 
-        String oldCondition = mapping.get(priority);
+        String oldCondition = queryMapping.get(priority);
         if (oldCondition != null) {
-            mapping.put(priority, oldCondition + " OR " + newCondition);
+            queryMapping.put(priority, oldCondition + " OR " + newCondition);
         } else {
-            mapping.put(priority, newCondition);
+            queryMapping.put(priority, newCondition);
         }
     }
 
@@ -164,8 +147,8 @@ public class PriorityMap {
      * @return Mapping of priority level to a JPQL condition which defines the Users
      *         who have this priority
      */
-    public HashMap<Integer, String> getMapping() {
-        return mapping;
+    public HashMap<Integer, String> getQueryMapping() {
+        return queryMapping;
     }
 
     /**
@@ -177,14 +160,23 @@ public class PriorityMap {
     }
 
     /**
-     * @return The priority which applies to all authenticated users
+     * @param userName String in the format prefix/userName
+     * @return Relevant priority if prefix present and recognised,
+     *         otherwise defaultPriority
      */
-    public int getAuthenticatedPriority() {
-        return authenticatedPriority;
+    public Integer getAuthenticatedPriority(String userName) {
+        int index = userName.indexOf("/");
+        if (index < 0) {
+            String format = "No explicit authentication mechanism for {}, using default priority {}";
+            logger.debug(format, userName, defaultPriority);
+            return defaultPriority;
+        }
+        String prefix = userName.substring(0, index);
+        return authenticatedMapping.getOrDefault(prefix, defaultPriority);
     }
 
     /**
-     * @return The priority which applies to all users, included anonymous access
+     * @return The priority which applies to any user without a specific setting.
      */
     public int getDefaultPriority() {
         return defaultPriority;
