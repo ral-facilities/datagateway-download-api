@@ -42,7 +42,9 @@ import org.icatproject.topcat.PriorityMap;
 import org.icatproject.topcat.FacilityMap;
 import org.icatproject.topcat.IcatClient;
 import org.icatproject.topcat.Properties;
+import org.icatproject.topcat.TransportMap;
 import org.icatproject.topcat.IcatClient.DatafilesResponse;
+import org.icatproject.topcat.TransportMap.TransportMechanism;
 
 @Stateless
 @LocalBean
@@ -101,11 +103,12 @@ public class UserResource {
 	 * @param plugin       ICAT authentication plugin. If null, a default value will be used.
 	 * @return json with sessionId of the form
 	 *         <samp>{"sessionId","0d9a3706-80d4-4d29-9ff3-4d65d4308a24"}</samp>
-	 * @throws BadRequestException
+	 * @throws TopcatException 
 	 */
 	@POST
 	@Path("/session")
-	public String login(@QueryParam("facilityName") String facilityName, @FormParam("username") String username, @FormParam("password") String password, @FormParam("plugin") String plugin) throws BadRequestException {
+	public String login(@QueryParam("facilityName") String facilityName, @FormParam("username") String username,
+			@FormParam("password") String password, @FormParam("plugin") String plugin) throws TopcatException {
 		if (plugin == null) {
 			plugin = defaultPlugin;
 		}
@@ -732,12 +735,15 @@ public class UserResource {
 		}
 
 		validateTransport(transport);
+		email = validateEmail(transport, email);
 
 		String icatUrl = getIcatUrl( facilityName );
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 		String userName = icatClient.getUserName();
 		PriorityMap priorityMap = PriorityMap.getInstance();
 		priorityMap.checkAnonDownloadEnabled(userName);
+		TransportMap transportMap = TransportMap.getInstance();
+		transportMap.checkAllowed(facilityName, transport, userName, icatClient);
 		String cartUserName = getCartUserName(userName, sessionId);
 
 		logger.info("submitCart: get cart for user: " + cartUserName + ", facility: " + facilityName + "...");
@@ -747,11 +753,6 @@ public class UserResource {
 		Long downloadId = null;
 		String transportUrl = getDownloadUrl(facilityName, transport);
 		IdsClient idsClient = new IdsClient(transportUrl);
-
-		if(email != null && email.equals("")){
-			email = null;
-		}
-
 
 		if (cart != null) {
 			em.refresh(cart);
@@ -794,7 +795,7 @@ public class UserResource {
 				downloadItems.add(downloadItem);
 			}
 			download.setDownloadItems(downloadItems);
-			downloadId = submitDownload(idsClient, download, DownloadStatus.PREPARING);
+			downloadId = submitDownload(idsClient, download, DownloadStatus.PREPARING, 0);
 			try {
 				em.remove(cart);
 				em.flush();
@@ -856,11 +857,14 @@ public class UserResource {
 	 * @param idsClient      Client for the IDS to use for the Download
 	 * @param download       Download to submit
 	 * @param downloadStatus Initial DownloadStatus to set if and only if the IDS isTwoLevel
+	 * @param priority		 Priority to submit the Download with
 	 * @return Id of the new Download
 	 * @throws TopcatException
 	 */
-	private long submitDownload(IdsClient idsClient, Download download, DownloadStatus downloadStatus)
+	private long submitDownload(IdsClient idsClient, Download download, DownloadStatus downloadStatus, int priority)
 			throws TopcatException {
+
+		download.setPriority(priority);
 		Boolean isTwoLevel = idsClient.isTwoLevel();
 		download.setIsTwoLevel(isTwoLevel);
 
@@ -912,6 +916,7 @@ public class UserResource {
 		}
 		logger.info("queueVisitId called for {}", visitId);
 		validateTransport(transport);
+		email = validateEmail(transport, email);
 
 		facilityName = validateFacilityName(facilityName);
 		String icatUrl = getIcatUrl(facilityName);
@@ -922,7 +927,10 @@ public class UserResource {
 		// If we wanted to block the user, this is where we would do it
 		String userName = icatClient.getUserName();
 		String fullName = icatClient.getFullName();
-		icatClient.checkQueueAllowed(userName);
+		int priority = icatClient.getQueuePriority(userName);
+		icatClient.checkQueueAllowed(priority);
+		TransportMap transportMap = TransportMap.getInstance();
+		transportMap.checkAllowed(facilityName, transport, userName, icatClient);
 		JsonArray datasets = icatClient.getDatasets(visitId);
 		if (datasets.size() == 0) {
 			throw new NotFoundException("No Datasets found for " + visitId);
@@ -977,7 +985,7 @@ public class UserResource {
 		for (Download download : downloads) {
 			String partFilename = formatQueuedFilename(fileName, part, downloads.size());
 			download.setFileName(partFilename);
-			downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED);
+			downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED, priority);
 			jsonArrayBuilder.add(downloadId);
 			part += 1;
 		}
@@ -1037,6 +1045,7 @@ public class UserResource {
 		}
 		logger.info("queueFiles called for {} files", files.size());
 		validateTransport(transport);
+		email = validateEmail(transport, email);
 		facilityName = validateFacilityName(facilityName);
 		if (fileName == null) {
 			fileName = facilityName + "_files";
@@ -1049,7 +1058,10 @@ public class UserResource {
 
 		String userName = icatClient.getUserName();
 		String fullName = icatClient.getFullName();
-		icatClient.checkQueueAllowed(userName);
+		int priority = icatClient.getQueuePriority(userName);
+		icatClient.checkQueueAllowed(priority);
+		TransportMap transportMap = TransportMap.getInstance();
+		transportMap.checkAllowed(facilityName, transport, userName, icatClient);
 
 		DatafilesResponse response = icatClient.getDatafiles(files);
 		if (response.ids.size() == 0) {
@@ -1065,7 +1077,7 @@ public class UserResource {
 		download.setDownloadItems(downloadItems);
 		download.setSize(response.totalSize);
 
-		long downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED);
+		long downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED, priority);
 
 		JsonObjectBuilder jsonObjectBuilder = Json.createObjectBuilder();
 		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
@@ -1116,6 +1128,27 @@ public class UserResource {
 	}
 
 	/**
+	 * Validate that the submitted email is not null or empty if mail.required is true.
+	 * 
+	 * @param transport Transport mechanism to use (which may require email)
+	 * @param email Users email address, which may be null or empty
+	 * @return The original email, or null if it was an empty string
+	 * @throws BadRequestException if email null or empty and mail.required is true
+	 */
+	private static String validateEmail(String transport, String email) throws BadRequestException {
+		if(email != null && email.equals("")){
+			email = null;
+		}
+
+		String emailRequired = Properties.getInstance().getProperty("mail.required." + transport, "false");
+		if (Boolean.parseBoolean(emailRequired) && email == null) {
+			throw new BadRequestException("email is required for " + transport);
+		}
+
+		return email;
+	}
+
+	/**
 	 * Retrieves the total file size (in bytes) for any investigation, datasets or datafiles.
 	 *
 	 * @summary getSize
@@ -1156,6 +1189,51 @@ public class UserResource {
 	}
 
 	/**
+	 * Get details of all DownloadTypes the user (identified by sessionId) is allowed
+	 * to use.
+	 * 
+	 * @param facilityName ICAT Facility.name
+	 * @param sessionId    ICAT sessionId
+	 * @return JsonObject with all visible DownloadTypes as keys, and an inner
+	 *         JsonObject with "disabled", "message", "idsUrl", "displayName" and
+	 *         "description" as keys.
+	 * @throws TopcatException if provided values are not recognised, or queries fail
+	*/
+	@GET
+	@Path("/downloadType/status")
+	@Produces({MediaType.APPLICATION_JSON})
+	public Response getDownloadTypeStatuses(@QueryParam("facilityName") String facilityName,
+			@QueryParam("sessionId") String sessionId) throws TopcatException {
+
+		facilityName = validateFacilityName(facilityName);
+
+		String icatUrl = getIcatUrl(facilityName);
+		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
+		String userName = icatClient.getUserName();
+		TransportMap transportMap = TransportMap.getInstance();
+
+		JsonObjectBuilder responseJson = Json.createObjectBuilder();
+		List<DownloadType> downloadTypes = downloadTypeRepository.getDownloadTypes(facilityName);
+		for (DownloadType downloadType : downloadTypes) {
+			String downloadTypeName = downloadType.getDownloadType();
+			if (transportMap.isAllowed(facilityName, downloadTypeName, userName, icatClient)) {
+				JsonObjectBuilder downloadTypeBuilder = Json.createObjectBuilder();
+				downloadTypeBuilder.add("disabled", downloadType.getDisabled());
+				downloadTypeBuilder.add("message", downloadType.getMessage());
+				TransportMechanism transportMechanism = transportMap.getTransportMechanism(facilityName, downloadTypeName);
+				if (transportMechanism != null) {
+					downloadTypeBuilder.add("idsUrl", transportMechanism.idsUrl);
+					downloadTypeBuilder.add("displayName", transportMechanism.displayName);
+					downloadTypeBuilder.add("description", transportMechanism.description);
+				}
+				responseJson.add(downloadTypeName, downloadTypeBuilder);
+			}
+		}
+
+		return Response.ok().entity(responseJson.build().toString()).build();
+	}
+
+	/**
 	 * Query the enabled/disabled status of a download type. The default status is enabled.
 	 * 
 	 * @summary getDownloadTypeStatus
@@ -1169,7 +1247,8 @@ public class UserResource {
 	 *            a valid session id which takes the form
 	 *            <code>0d9a3706-80d4-4d29-9ff3-4d65d4308a24</code>
 	 *
-	 * @return JSON object with disabled (boolean) and message (string) fields
+	 * @return JSON object with disabled (boolean) and message (string) fields; and if
+	 *         defined in the config the idsUrl, displayName and description (String)
 	 * 
 	 * @throws TopcatException
 	 */
@@ -1181,7 +1260,14 @@ public class UserResource {
 			@QueryParam("facilityName") String facilityName,
 			@QueryParam("sessionId") String sessionId)
 					throws TopcatException {
-		  
+
+		facilityName = validateFacilityName(facilityName);
+		String icatUrl = getIcatUrl(facilityName);
+		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
+		String userName = icatClient.getUserName();
+		TransportMap transportMap = TransportMap.getInstance();
+		transportMap.checkAllowed(facilityName, type, userName, icatClient);
+
 		Boolean disabled = false;
 		String message = "";
 		DownloadType downloadType = downloadTypeRepository.getDownloadType(facilityName, type);
@@ -1194,6 +1280,13 @@ public class UserResource {
 		JsonObjectBuilder responseJson = Json.createObjectBuilder()
 				.add("disabled", disabled)
 				.add("message", message);
+
+		TransportMechanism transportMechanism = transportMap.getTransportMechanism(facilityName, type);
+		if (transportMechanism != null) {
+			responseJson.add("idsUrl", transportMechanism.idsUrl);
+			responseJson.add("displayName", transportMechanism.displayName);
+			responseJson.add("description", transportMechanism.description);
+		}
 
 		return Response.ok().entity(responseJson.build().toString()).build();
 	}

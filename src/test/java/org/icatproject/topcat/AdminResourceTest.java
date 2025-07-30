@@ -23,12 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
+import org.junit.jupiter.api.function.Executable;
 import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.domain.Download;
 import org.icatproject.topcat.domain.DownloadStatus;
@@ -170,7 +172,7 @@ public class AdminResourceTest {
 				downloadStatus = "PAUSED";
 			}
 	
-			response = adminResource.setDownloadStatus(testDownload.getId(), facilityName, adminSessionId, downloadStatus);
+			response = adminResource.setDownloadStatus(testDownload.getId(), facilityName, adminSessionId, downloadStatus, null);
 			assertEquals(200, response.getStatus());
 	
 			// and test that the new status has been set
@@ -215,7 +217,7 @@ public class AdminResourceTest {
 	
 			try {
 				response = adminResource.setDownloadStatus(testDownload.getId(), facilityName, nonAdminSessionId,
-						downloadStatus);
+						downloadStatus, null);
 				// We should not see the following
 				System.out.println("DEBUG: AdminRT.setDownloadStatus response: " + response.getStatus() + ", "
 						+ (String) response.getEntity());
@@ -254,7 +256,7 @@ public class AdminResourceTest {
 			downloadRepository.save(testDownload);
 			downloadId = testDownload.getId();
 
-			Response response = adminResource.setDownloadStatus(downloadId, facilityName, adminSessionId, DownloadStatus.RESTORING.toString());
+			Response response = adminResource.setDownloadStatus(downloadId, facilityName, adminSessionId, DownloadStatus.RESTORING.toString(), null);
 			assertEquals(200, response.getStatus());
 
 			response = adminResource.getDownloads(facilityName, adminSessionId, null);
@@ -271,74 +273,103 @@ public class AdminResourceTest {
 	}
 
 	@Test
-	public void testSetDownloadTypeStatus() throws Exception {
-
-		String facilityName = "LILS";
-		String downloadType = "http";
-		Response response;
-		JsonObject json;
-
-		// Determine the current download type status; remember, it may not be set at
-		// all
-
-		Boolean disabled = false;
-		String message = "";
-		DownloadType dt = downloadTypeRepository.getDownloadType(facilityName, downloadType);
-
-		if (dt != null) {
-			disabled = dt.getDisabled();
-			message = dt.getMessage();
-			System.out.println("DEBUG: AdminRT: initial download type status is {" + disabled + "," + message + "}");
-		} else {
-			System.out.println("DEBUG: AdminRT: initial download type status not found");
-		}
-
-		if (message.length() == 0) {
-			message = "Disabled for testing";
-		}
-
-		// Toggle the disabled status
-
-		response = adminResource.setDownloadTypeStatus(downloadType, facilityName, adminSessionId, !disabled, message);
-		assertEquals(200, response.getStatus());
-
-		// Now test that it has had the desired result
-
-		dt = downloadTypeRepository.getDownloadType(facilityName, downloadType);
-
-		assertNotNull(dt);
-		if (dt != null) {
-			System.out.println(
-					"DEBUG: AdminRT final download type status is {" + dt.getDisabled() + "," + dt.getMessage() + "}");
-			assertNotEquals(disabled, dt.getDisabled());
-			assertEquals(message, dt.getMessage());
-		}
-
-		// Test that setDownloadTypeStatus produces an error for non-admin users.
-
+	public void testSetDownloadStatusNoCustomDownloadUrl() throws Exception {
+		Long downloadId = null;
 		try {
-			response = adminResource.setDownloadTypeStatus(downloadType, facilityName, nonAdminSessionId, !disabled,
-					message);
-			// We should not see the following
-			System.out.println("DEBUG: AdminRT.setDownloadTypeStatus response: " + response.getStatus() + ", "
-					+ (String) response.getEntity());
-			fail("AdminResource.setDownloadTypeStatus did not raise exception for non-admin user");
-		} catch (ForbiddenException fe) {
+			Download testDownload = new Download();
+			String facilityName = "LILS";
+			testDownload.setFacilityName(facilityName);
+			testDownload.setSessionId(adminSessionId);
+			testDownload.setStatus(DownloadStatus.QUEUED);
+			testDownload.setIsDeleted(false);
+			testDownload.setUserName("simple/root");
+			testDownload.setFileName("testFile.txt");
+			testDownload.setTransport("http");
+			downloadRepository.save(testDownload);
+			downloadId = testDownload.getId();
+
+			Response response = adminResource.setDownloadStatus(downloadId, facilityName, adminSessionId,
+				DownloadStatus.COMPLETE.toString(), null);
+			assertEquals(200, response.getStatus());
+
+			response = adminResource.getDownloads(facilityName, adminSessionId, null);
+			assertEquals(200, response.getStatus());
+			List<Download> downloads = (List<Download>) response.getEntity();
+
+			testDownload = findDownload(downloads, downloadId);
+			assertEquals(DownloadStatus.COMPLETE, testDownload.getStatus());
+			assertFalse(testDownload.getIsEmailSent());
+		} finally {
+			if (downloadId != null) {
+				downloadRepository.removeDownload(downloadId);
+			}
 		}
+	}
 
-		// Finally, ought to reset the disabled status to the original value!
-		// (Though we could have used a dummy download type for the test...)
-		// However, this won't reset an originally-empty message.
+	@Test
+	public void testSetDownloadStatusCustomDownloadUrl() throws Exception {
+		Long downloadId = null;
+		try {
+			Download testDownload = new Download();
+			String facilityName = "LILS";
+			testDownload.setFacilityName(facilityName);
+			testDownload.setSessionId(adminSessionId);
+			testDownload.setStatus(DownloadStatus.QUEUED);
+			testDownload.setIsDeleted(false);
+			testDownload.setUserName("simple/root");
+			testDownload.setFileName("testFile.txt");
+			testDownload.setTransport("http");
+			downloadRepository.save(testDownload);
+			downloadId = testDownload.getId();
 
-		if (dt != null) {
-			response = adminResource.setDownloadTypeStatus(downloadType, facilityName, adminSessionId, disabled,
-					message);
+			Response response = adminResource.setDownloadStatus(downloadId, facilityName, adminSessionId,
+				DownloadStatus.COMPLETE.toString(), "customDownloadUrl");
 			assertEquals(200, response.getStatus());
-		} else {
-			// There was no entry for this download type previously. As the status is false
-			// by default, make sure that's what we set it to now!
-			response = adminResource.setDownloadTypeStatus(downloadType, facilityName, adminSessionId, false, message);
+
+			response = adminResource.getDownloads(facilityName, adminSessionId, null);
 			assertEquals(200, response.getStatus());
+			List<Download> downloads = (List<Download>) response.getEntity();
+
+			testDownload = findDownload(downloads, downloadId);
+			assertEquals(DownloadStatus.COMPLETE, testDownload.getStatus());
+			assertTrue(testDownload.getIsEmailSent());
+		} finally {
+			if (downloadId != null) {
+				downloadRepository.removeDownload(downloadId);
+			}
+		}
+	}
+
+	@Test
+	public void testSetDownloadTypeStatus() throws Exception {
+		System.out.println("DEBUG testSetDownloadTypeStatus");
+		Long typeId = null;
+		try {
+			String facilityName = "LILS";
+			String name = "http";
+			Boolean disabled = false;
+			String message = "";
+			Response response = adminResource.setDownloadTypeStatus(name, facilityName, adminSessionId, disabled, message);
+			assertEquals(200, response.getStatus());
+
+			// Now test that it has had the desired result
+
+			DownloadType downloadType = downloadTypeRepository.getDownloadType(facilityName, name);
+			assertNotNull(downloadType);
+			typeId = downloadType.getId();
+			assertFalse(downloadType.getDisabled());
+			assertEquals(message, downloadType.getMessage());
+
+			// Test that setDownloadTypeStatus produces an error for non-admin users.
+
+			Executable executable = () -> {
+				adminResource.setDownloadTypeStatus(name, facilityName, nonAdminSessionId, disabled, message);
+			};
+			assertThrows(ForbiddenException.class, executable);
+
+		} finally {
+			// Remove the entry we created to avoid interference with other tests
+			downloadTypeRepository.remove(typeId);
 		}
 	}
 

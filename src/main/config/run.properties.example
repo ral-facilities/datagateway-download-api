@@ -22,8 +22,19 @@ facility.YFH.idsUrl = https://your.facility.idsUrl.here
 # If the property is not defined, Topcat will use the facility's idsUrl by default.
 
 facility.LILS.downloadType.http = http://localhost:8080
+facility.LILS.downloadType.list = http
+facility.LILS.downloadType.http.displayName = HTTP
+facility.LILS.downloadType.http.description = Example description for HTTP access method.
+
+facility.YFH.downloadType.list = https globus
 facility.YFH.downloadType.https = https://your.facility.downloadIdsUrl.here
+facility.YFH.downloadType.https.displayName = HTTPS
+facility.YFH.downloadType.https.description = Example description for HTTPS access method.
+facility.YFH.downloadType.https.disallowedAuthn = simple db
 facility.YFH.downloadType.globus = https://your.facility.globusUrl.here
+facility.YFH.downloadType.globus.displayName = Globus
+facility.YFH.downloadType.globus.description = Example description for Globus access method.
+facility.YFH.downloadType.globus.allowedGroupings = principal_beamline_scientists admins
 
 # Maximum number of Datafiles that can be included in a single cart request.
 # Investigations and Datasets are expanded into their constituent Datafiles for this count.
@@ -42,6 +53,7 @@ mail.enable=true
 # ${fileName} - the download name
 # ${size} - the download size
 # ${downloadUrl} - the download url
+# ${customValue} - optionally set by calls to setDownloadStatus where the status is complete
 mail.subject=TopCAT Download ${fileName} Ready
 
 # The email body message for https downloads. All subject tokens as above are available.
@@ -55,6 +67,10 @@ mail.body.smartclient=Hi ${userName}, \n\nYour ${size} SmartClient download ${fi
 
 # The email body message for SCARF downloads. All subject tokens as above are available.
 mail.body.scarf=Hi ${userName}, \n\nYour ${size} SCARF download ${fileName} is ready. Please see https:/example.com/#/scarf-faq for more information on how to download using SCARF.\n\nThank you for using TopCAT
+
+# The email body message for Ada downloads. All subject tokens as above are available.
+mail.body.ada = Hi ${userName}, \n\nYour ${size} recall ${fileName} is ready as an Ada data share. Please visit https:/example.com to redeem access using the following token.\n\n${customValue}\n\nThank you for using DataGateway
+mail.required.ada = true
 
 # The maximum number of datafiles for a getStatus call to the IDS for two level storage
 ids.getStatus.max=100
@@ -137,8 +153,8 @@ queue.priority.instrumentScientist.instruments = {"ABC": 1}
 queue.priority.instrumentScientist.default = 2
 queue.priority.investigationUser.roles = {"ABC": 3}
 queue.priority.investigationUser.default = 4
-queue.priority.authenticated = 5
-queue.priority.default = 0
+queue.priority.authenticated = {"orcid": 6, "anon": 0}
+queue.priority.default = 5
 
 # Configurable limit for the length of the GET URL for requesting Datafiles by a list of file locations
 # The exact limit may depend on the server

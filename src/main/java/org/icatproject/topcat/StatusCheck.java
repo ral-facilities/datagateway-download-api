@@ -172,13 +172,15 @@ public class StatusCheck {
       if( idsClient == null ) {
     	  idsClient = new IdsClient(getDownloadUrl(download.getFacilityName(),download.getTransport()));
       }
-      if(!download.getIsEmailSent() && download.getStatus() == DownloadStatus.COMPLETE){
+      if (download.getStatus() == DownloadStatus.COMPLETE) {
     	  logger.info("Download COMPLETE for " + download.getFileName() + " " + download.getId() + "; checking whether to send email...");
-        download.setIsEmailSent(true);
-        em.persist(download);
-        em.flush();
+        if (!download.getIsEmailSent()) {
+          sendDownloadReadyEmail(download);
+          download.setIsEmailSent(true);
+          em.persist(download);
+          em.flush();
+        }
         lastChecks.remove(download.getId());
-        sendDownloadReadyEmail(download);
       } else if(download.getTransport().matches("https|http") && idsClient.isPrepared(download.getPreparedId())){
     	  logger.info("Download (http[s]) for " + download.getFileName() + " " + download.getId() + " is Prepared, so setting COMPLETE and checking email...");
         download.setStatus(DownloadStatus.COMPLETE);
@@ -203,7 +205,28 @@ public class StatusCheck {
     }
   }
 
-  private void sendDownloadReadyEmail(Download download) throws InternalException{
+  /**
+   * Send an email for a completed Download.
+   * 
+   * @param download Download that has completed
+   * @throws InternalException If download does not have a valid facilityName
+   */
+  private void sendDownloadReadyEmail(Download download) throws InternalException {
+    String downloadUrl = getDownloadUrl(download.getFacilityName(),download.getTransport());
+    downloadUrl += "/ids/getData?preparedId=" + download.getPreparedId();
+    downloadUrl += "&outname=" + download.getFileName();
+    sendDownloadReadyEmail(mailSession, download, downloadUrl, null);
+  }
+
+  /**
+   * Send an email for a completed Download.
+   * 
+   * @param mailSession Jakarta mail session to use
+   * @param download    Download that has completed
+   * @param downloadUrl URL that provides the recipient access to their data
+   * @param customValue Custom value to substitute into the message body, set by Pollcat
+   */
+  public static void sendDownloadReadyEmail(Session mailSession, Download download, String downloadUrl, String customValue) {
     EmailValidator emailValidator = EmailValidator.getInstance();
     Properties properties = Properties.getInstance();
 
@@ -216,10 +239,6 @@ public class StatusCheck {
           userName = fullName;
         }
 
-        String downloadUrl = getDownloadUrl(download.getFacilityName(),download.getTransport());
-        downloadUrl += "/ids/getData?preparedId=" + download.getPreparedId();
-        downloadUrl += "&outname=" + download.getFileName();
-
         Map<String, String> valuesMap = new HashMap<String, String>();
         valuesMap.put("email", download.getEmail());
         valuesMap.put("userName", userName);
@@ -228,6 +247,7 @@ public class StatusCheck {
         valuesMap.put("downloadUrl", downloadUrl);
         valuesMap.put("fileName", download.getFileName());
         valuesMap.put("size", Utils.bytesToHumanReadable(download.getSize()));
+        valuesMap.put("customValue", customValue);
 
         StringSubstitutor sub = new StringSubstitutor(valuesMap);
         String subject = sub.replace(properties.getProperty("mail.subject", "mail.subject not set in run.properties"));
@@ -397,8 +417,8 @@ public class StatusCheck {
       availableDownloads -= activeDownloadsSize;
     }
 
-    String queuedQueryString = selectString + " and " + queuedCondition;
-    queuedQueryString += " order by download.createdAt";
+    String queuedQueryString = selectString + " and " + queuedCondition + " and download.priority > 0";
+    queuedQueryString += " order by download.priority asc NULLS FIRST, download.createdAt asc";
     TypedQuery<Download> queuedDownloadsQuery = em.createQuery(queuedQueryString, Download.class);
     List<Download> queuedDownloads = queuedDownloadsQuery.getResultList();
     int queueSize = queuedDownloads.size();
@@ -410,42 +430,12 @@ public class StatusCheck {
     if (maxActiveDownloads <= 0) {
       // No limits on how many to submit
       logger.info("Preparing 1 out of {} queued downloads", queueSize);
-      Download queuedDownload = queuedDownloads.get(0);
-      queuedDownload.setStatus(DownloadStatus.PREPARING);
-      prepareDownload(queuedDownload, null, getQueueSessionId(sessionIds, queuedDownload.getFacilityName()));
     } else {
       logger.info("Preparing 1 out of {} queued downloads as {} spaces available", queueSize, availableDownloads);
-      HashMap<Integer, List<Download>> mapping = new HashMap<>();
-      for (Download queuedDownload : queuedDownloads) {
-        String sessionId = getQueueSessionId(sessionIds, queuedDownload.getFacilityName());
-        String icatUrl = FacilityMap.getInstance().getIcatUrl(queuedDownload.getFacilityName());
-        IcatClient icatClient = new IcatClient(icatUrl, sessionId);
-        int priority = icatClient.getQueuePriority(queuedDownload.getUserName());
-        if (priority == 1) {
-          // Highest priority, prepare now
-          queuedDownload.setStatus(DownloadStatus.PREPARING);
-          prepareDownload(queuedDownload, null, sessionId);
-          return;
-        } else {
-          // Lower priority, add to mapping
-          mapping.putIfAbsent(priority, new ArrayList<>());
-          mapping.get(priority).add(queuedDownload);
-        }
-      }
-
-      // Get the highest priority encountered
-      List<Integer> keyList = new ArrayList<>();
-      for (Object key : mapping.keySet().toArray()) {
-        keyList.add((Integer) key);
-      }
-      int priority = Collections.min(keyList);
-
-      // Prepare the first Download at this priority level
-      List<Download> downloadList = mapping.get(priority);
-      Download download = downloadList.get(0);
-      download.setStatus(DownloadStatus.PREPARING);
-      prepareDownload(download, null, getQueueSessionId(sessionIds, download.getFacilityName()));
     }
+    Download queuedDownload = queuedDownloads.get(0);
+    queuedDownload.setStatus(DownloadStatus.PREPARING);
+    prepareDownload(queuedDownload, null, getQueueSessionId(sessionIds, queuedDownload.getFacilityName()));
   }
 
   private void handleException( Download download, String reason, boolean doExpire ) {

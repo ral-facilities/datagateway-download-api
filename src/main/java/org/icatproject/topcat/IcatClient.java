@@ -173,25 +173,39 @@ public class IcatClient {
 	 * @param password ICAT password
 	 * @return json with sessionId of the form
 	 *         <samp>{"sessionId","0d9a3706-80d4-4d29-9ff3-4d65d4308a24"}</samp>
-	 * @throws BadRequestException
+	 * @throws TopcatException
 	 */
-	public String login(String plugin, String username, String password) throws BadRequestException {
+	public String login(String plugin, String username, String password) throws TopcatException {
+		JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
+		JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+		JsonObjectBuilder usernameBuilder = Json.createObjectBuilder();
+		JsonObjectBuilder passwordBuilder = Json.createObjectBuilder();
+		usernameBuilder.add("username", username);
+		passwordBuilder.add("password", password);
+		arrayBuilder.add(usernameBuilder);
+		arrayBuilder.add(passwordBuilder);
+		objectBuilder.add("plugin", plugin);
+		objectBuilder.add("credentials", arrayBuilder);
+		String jsonString = "json=" + objectBuilder.build().toString();
+		Response response;
 		try {
-			JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-			JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
-			JsonObjectBuilder usernameBuilder = Json.createObjectBuilder();
-			JsonObjectBuilder passwordBuilder = Json.createObjectBuilder();
-			usernameBuilder.add("username", username);
-			passwordBuilder.add("password", password);
-			arrayBuilder.add(usernameBuilder);
-			arrayBuilder.add(passwordBuilder);
-			objectBuilder.add("plugin", plugin);
-			objectBuilder.add("credentials", arrayBuilder);
-			String jsonString = "json=" + objectBuilder.build().toString();
-			Response response = httpClient.post("session", new HashMap<String, String>(), jsonString);
-			return response.toString();
+			response = httpClient.post("session", new HashMap<String, String>(), jsonString);
 		} catch (Exception e) {
 			throw new BadRequestException(e.getMessage());
+		}
+		switch (response.getCode()) {
+			case 200:
+				return response.toString();
+			case 400:
+				throw new BadRequestException(response.toString());
+			case 401:
+				throw new AuthenticationException(response.toString());
+			case 403:
+				throw new ForbiddenException(response.toString());
+			case 404:
+				throw new NotFoundException(response.toString());
+			default:
+				throw new InternalException(response.toString());
 		}
 	}
 
@@ -514,7 +528,15 @@ public class IcatClient {
 	 *                         another internal error is triggered)
 	 */
 	public void checkQueueAllowed(String userName) throws TopcatException {
-		if (getQueuePriority(userName) < 1) {
+		checkQueueAllowed(getQueuePriority(userName));
+	}
+
+	/**
+	 * @param priority int priority to check
+	 * @throws TopcatException if priority < 1
+	 */
+	public void checkQueueAllowed(int priority) throws TopcatException {
+		if (priority < 1) {
 			throw new ForbiddenException("Queuing Downloads forbidden");
 		}
 	}
@@ -536,7 +558,7 @@ public class IcatClient {
 		if (userPriority != null) {
 			return userPriority;
 		}
-		HashMap<Integer, String> mapping = priorityMap.getMapping();
+		HashMap<Integer, String> mapping = priorityMap.getQueryMapping();
 		List<Integer> keyList = new ArrayList<>(mapping.keySet());
 		Collections.sort(keyList);
 		for (Integer priority : keyList) {
@@ -545,13 +567,7 @@ public class IcatClient {
 			}
 		}
 
-		String anonUserName = Properties.getInstance().getProperty("anonUserName");
-		if (anonUserName == null || !userName.startsWith(anonUserName)) {
-			// The anonymous cart username will end with the user's sessionId so cannot do .equals
-			return priorityMap.getAuthenticatedPriority();
-		} else {
-			return priorityMap.getDefaultPriority();
-		}
+		return priorityMap.getAuthenticatedPriority(userName);
 	}
 
 	/**
@@ -568,8 +584,28 @@ public class IcatClient {
 		return results.size();
 	}
 
+	/**
+	 * @param userName  ICAT User.name
+	 * @param groupings ICAT Grouping.names
+	 * @return whether userName is in any of the named groupings
+	 * @throws TopcatException if the query fails
+	 */
+	public boolean isInGroups(String userName, Set<String> groupings) throws TopcatException {
+		String query = "SELECT userGroup FROM UserGroup userGroup WHERE userGroup.user.name = :user";
+		query += " AND userGroup.grouping.name IN ('" + String.join("','", groupings) + "')";
+		JsonArray results = submitQuery(query);
+		return results.size() > 0;
+	}
+
 	protected String[] getAdminUserNames() throws Exception {
 		return Properties.getInstance().getProperty("adminUserNames", "").split("([ ]*,[ ]*|[ ]+)");
+	}
+
+	/**
+	 * @param sessionId ICAT sessionId
+	 */
+	public void setSessionId(String sessionId) {
+		this.sessionId = sessionId;
 	}
 
 }
