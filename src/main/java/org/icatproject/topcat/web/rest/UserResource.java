@@ -711,6 +711,8 @@ public class UserResource {
 	 * 
 	 * @throws TopcatException
 	 *             if anything else goes wrong.
+	 * @throws UnsupportedEncodingException
+	 *             if Entity ids cannot be URL encoded for ICAT queries
 	 */
 	@POST
 	@Path("/cart/{facilityName}/submit")
@@ -721,7 +723,7 @@ public class UserResource {
 			@FormParam("email") String email,
 			@FormParam("fileName") String fileName,
 			@FormParam("zipType") String zipType)
-			throws TopcatException, MalformedURLException, ParseException {
+			throws TopcatException, MalformedURLException, ParseException, UnsupportedEncodingException {
 
 		logger.info("submitCart called");
 
@@ -750,6 +752,36 @@ public class UserResource {
 
 		if (cart != null) {
 			em.refresh(cart);
+			FacilityMap facilityMap = FacilityMap.getInstance();
+			Long countLimit = facilityMap.getCountLimit(facilityName);
+			Long sizeLimit = facilityMap.getSizeLimit(facilityName);
+			if (countLimit != null || sizeLimit != null) {
+				List<Long> investigationIds = new ArrayList<>();
+				List<Long> datasetIds = new ArrayList<>();
+				List<Long> datafileIds = new ArrayList<>();
+				for (CartItem cartItem : cart.getCartItems()) {
+					switch (cartItem.getEntityType()) {
+						case investigation:
+							investigationIds.add(cartItem.getEntityId());
+							continue;
+						case dataset:
+							datasetIds.add(cartItem.getEntityId());
+							continue;
+						case datafile:
+							datafileIds.add(cartItem.getEntityId());
+							continue;
+						default:
+							throw new InternalException("Unrecognised entityType: " + cartItem.getEntityType());
+					}
+				}
+				IcatClient.EntityCounter entityCounter = icatClient.new EntityCounter(investigationIds, datasetIds, datafileIds);
+				if (countLimit != null && entityCounter.totalCount > countLimit) {
+					throw new BadRequestException("Unable to submit for cart for download, number of files exceeds limit");
+				}
+				if (sizeLimit != null && entityCounter.totalSize > sizeLimit) {
+					throw new BadRequestException("Unable to submit for cart for download, size of files exceeds limit");
+				}
+			}
 			Download download = createDownload(sessionId, cart.getFacilityName(), fileName, cart.getUserName(),
 					fullName, transport, email);
 			List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();

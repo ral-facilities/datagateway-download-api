@@ -48,10 +48,113 @@ public class IcatClient {
 		}
 	}
 
+	/**
+	 * Utility class for calculating the count and size of a cart.
+	 */
+	public class EntityCounter {
+		private int getUrlLimit = Integer.parseInt(Properties.getInstance().getProperty("getUrlLimit", "1024"));
+		public long totalSize = 0L;
+		public long totalCount = 0L;
+
+		/**
+		 * Calculate the totalSize and totalCount of all ICAT Entities provided.
+		 * 
+		 * @param investigationIds List of ICAT Investigation.id in the cart
+		 * @param datasetIds       List of ICAT Dataset.id in the cart
+		 * @param datafileIds      List of ICAT Datafile.id in the cart
+		 * @throws UnsupportedEncodingException if Entity ids cannot be URL encoded for ICAT queries
+		 * @throws TopcatException if ICAT query fails
+		 */
+		public EntityCounter(List<Long> investigationIds, List<Long> datasetIds, List<Long> datafileIds)
+				throws UnsupportedEncodingException, TopcatException {
+
+			processIds(investigationIds, "SELECT SUM(i.fileSize), SUM(i.fileCount) FROM Investigation i WHERE i.id IN (");
+			processIds(datasetIds, "SELECT SUM(d.fileSize), SUM(d.fileCount) FROM Dataset d WHERE d.id IN (");
+			processIds(datafileIds, "SELECT SUM(d.fileSize) FROM Datafile d WHERE d.id IN (");
+			totalCount += datafileIds.size();
+		}
+
+		/**
+		 * Process ids for either Investigations, Datasets or Datafile. These will be
+		 * chunked into a series of IN clauses to avoid exceeding the max url length.
+		 * 
+		 * @param ids             List of ICAT Entity.id
+		 * @param queryPrefix     SELECT query up to but not including a chunked list of ids
+		 * @throws UnsupportedEncodingException if Entity ids cannot be URL encoded for ICAT queries
+		 * @throws TopcatException if ICAT query fails
+		 */
+		private void processIds(List<Long> ids, String queryPrefix) throws UnsupportedEncodingException, TopcatException {
+			if (!ids.isEmpty()) {
+				int chunkLimit = getUrlLimit - minimumQuerySize - URLEncoder.encode(queryPrefix, "UTF8").length() - parenthesisSize;
+				ListIterator<Long> iterator = ids.listIterator();
+				Long id = iterator.next();
+				String chunkedIds = id.toString();
+				int chunkSize = URLEncoder.encode(chunkedIds, "UTF8").length();
+				while (iterator.hasNext()) {
+					id = iterator.next();
+					String idString = id.toString();
+					int encodedIdLength = URLEncoder.encode(idString, "UTF8").length();
+					if (chunkSize + commaSize + encodedIdLength > chunkLimit) {
+						submitIdsChunk(queryPrefix, chunkedIds);
+						chunkedIds = idString;
+						chunkSize = encodedIdLength;
+					} else {
+						chunkedIds += "," + idString;
+						chunkSize += commaSize + encodedIdLength;
+					}
+				}
+				submitIdsChunk(queryPrefix, chunkedIds);
+			}
+		}
+
+		/**
+		 * Submits and processes the result from a chunk of ids.
+		 * 
+		 * @param queryPrefix SELECT query up to but not including a chunked list of ids
+		 * @param chunkedIds  Comma separated list of ICAT Entity ids
+		 * @throws TopcatException if ICAT query fails
+		 */
+		private void submitIdsChunk(String queryPrefix, String chunkedIds) throws TopcatException {
+			JsonArray jsonArray = submitQuery(queryPrefix + chunkedIds + ")");
+			JsonValue jsonValue = jsonArray.get(0);
+			if (jsonValue.getValueType().equals(ValueType.NUMBER)) {
+				totalSize += ((JsonNumber) jsonValue).longValueExact();
+			} else {
+				JsonArray jsonArrayInner = jsonValue.asJsonArray();
+				if (jsonArrayInner.get(0).getValueType().equals(ValueType.NUMBER)) {
+					totalSize += jsonArrayInner.getJsonNumber(0).longValueExact();
+				}
+				if (jsonArrayInner.size() > 1 && jsonArrayInner.get(1).getValueType().equals(ValueType.NUMBER)) {
+					totalCount += jsonArrayInner.getJsonNumber(1).longValueExact();
+				}
+			}
+		}
+	}
+
 	private Logger logger = LoggerFactory.getLogger(IcatClient.class);
 
 	private HttpClient httpClient;
 	private String sessionId;
+
+	private static final int minimumQuerySize = "entityManager?sessionId=&query=".length() + 36;  // sessionIds are 36 characters
+	private static final int commaSize;
+	private static final int parenthesisSize;
+
+	static {
+		int parenthesisSizeNonFinal = 3;
+		try {
+			parenthesisSizeNonFinal = URLEncoder.encode(")", "UTF8").length();
+		} catch (UnsupportedEncodingException e) {} finally{
+			parenthesisSize = parenthesisSizeNonFinal;
+		}
+
+		int commaSizeNonFinal = 3;
+		try {
+			commaSizeNonFinal = URLEncoder.encode(",", "UTF8").length();
+		} catch (UnsupportedEncodingException e) {} finally{
+			commaSize = commaSizeNonFinal;
+		}
+	}
 
 	public IcatClient(String url) {
 		this.httpClient = new HttpClient(url + "/icat");
@@ -201,12 +304,12 @@ public class IcatClient {
 			return response;
 		}
 
-		// Total limit - "entityManager?sessionId=" - `sessionId` - "?query=" - `queryPrefix` - `querySuffix
-		// Limit is 1024 - 24 - 36 - 7 - 48 - 17
-		int getUrlLimit = Integer.parseInt(Properties.getInstance().getProperty("getUrlLimit", "1024"));
-		int chunkLimit = getUrlLimit - 132;
 		String queryPrefix = "SELECT d from Datafile d WHERE d.location in (";
 		String querySuffix = ") ORDER BY d.id";
+		int getUrlLimit = Integer.parseInt(Properties.getInstance().getProperty("getUrlLimit", "1024"));
+		int queryPrefixSize = URLEncoder.encode(queryPrefix, "UTF8").length();
+		int querySuffixSize = URLEncoder.encode(querySuffix, "UTF8").length();
+		int chunkLimit = getUrlLimit - minimumQuerySize - queryPrefixSize - querySuffixSize;
 		ListIterator<String> iterator = files.listIterator();
 
 		String file = iterator.next();
@@ -217,7 +320,7 @@ public class IcatClient {
 			file = iterator.next();
 			String quotedFile = "'" + file + "'";
 			int encodedFileLength = URLEncoder.encode(quotedFile, "UTF8").length();
-			if (chunkSize + 3 + encodedFileLength > chunkLimit) {
+			if (chunkSize + commaSize + encodedFileLength > chunkLimit) {
 				response.submitDatafilesQuery(queryPrefix + chunkedFiles + querySuffix);
 
 				chunkedFiles = quotedFile;
@@ -225,7 +328,7 @@ public class IcatClient {
 				response.missing.add(file);
 			} else {
 				chunkedFiles += "," + quotedFile;
-				chunkSize += 3 + encodedFileLength;  // 3 is size of , when encoded as %2C
+				chunkSize += commaSize + encodedFileLength;
 				response.missing.add(file);
 			}
 		}
@@ -291,7 +394,7 @@ public class IcatClient {
 	 * @throws TopcatException
 	 */
 	public long getDatasetFileSize(long datasetId) throws TopcatException {
-			String query = "SELECT SUM(datafile.fileSize) FROM Datafile datafile WHERE datafile.dataset.id = " + datasetId;
+		String query = "SELECT SUM(datafile.fileSize) FROM Datafile datafile WHERE datafile.dataset.id = " + datasetId;
 		JsonArray jsonArray = submitQuery(query);
 		if (jsonArray.get(0).getValueType().equals(ValueType.NUMBER)) {
 			return jsonArray.getJsonNumber(0).longValueExact();
