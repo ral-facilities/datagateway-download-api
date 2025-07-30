@@ -68,9 +68,9 @@ public class IcatClient {
 		public EntityCounter(List<Long> investigationIds, List<Long> datasetIds, List<Long> datafileIds)
 				throws UnsupportedEncodingException, TopcatException {
 
-			processIds(investigationIds, "SELECT SUM(i.fileSize), SUM(i.fileCount) FROM Investigation i WHERE i.id IN (", 89);
-			processIds(datasetIds, "SELECT SUM(d.fileSize), SUM(d.fileCount) FROM Dataset d WHERE d.id IN (", 83);
-			processIds(datafileIds, "SELECT SUM(d.fileSize) FROM Datafile d WHERE d.id IN (", 60);
+			processIds(investigationIds, "SELECT SUM(i.fileSize), SUM(i.fileCount) FROM Investigation i WHERE i.id IN (");
+			processIds(datasetIds, "SELECT SUM(d.fileSize), SUM(d.fileCount) FROM Dataset d WHERE d.id IN (");
+			processIds(datafileIds, "SELECT SUM(d.fileSize) FROM Datafile d WHERE d.id IN (");
 			totalCount += datafileIds.size();
 		}
 
@@ -80,13 +80,12 @@ public class IcatClient {
 		 * 
 		 * @param ids             List of ICAT Entity.id
 		 * @param queryPrefix     SELECT query up to but not including a chunked list of ids
-		 * @param queryPrefixSize The size of queryPrefix once URL encoded
 		 * @throws UnsupportedEncodingException if Entity ids cannot be URL encoded for ICAT queries
 		 * @throws TopcatException if ICAT query fails
 		 */
-		private void processIds(List<Long> ids, String queryPrefix, int queryPrefixSize) throws UnsupportedEncodingException, TopcatException {
+		private void processIds(List<Long> ids, String queryPrefix) throws UnsupportedEncodingException, TopcatException {
 			if (!ids.isEmpty()) {
-				int chunkLimit = getUrlLimit - 70 - queryPrefixSize;
+				int chunkLimit = getUrlLimit - minimumQuerySize - URLEncoder.encode(queryPrefix, "UTF8").length() - 3;  // 3 is the size of closing ) when encoded as %29
 				ListIterator<Long> iterator = ids.listIterator();
 				Long id = iterator.next();
 				String chunkedIds = id.toString();
@@ -95,7 +94,7 @@ public class IcatClient {
 					id = iterator.next();
 					String idString = id.toString();
 					int encodedIdLength = URLEncoder.encode(idString, "UTF8").length();
-					if (chunkSize + 3 + encodedIdLength > chunkLimit) {
+					if (chunkSize + 3 + encodedIdLength > chunkLimit) {  // 3 is size of , when encoded as %2C
 						submitIdsChunk(queryPrefix, chunkedIds);
 						chunkedIds = idString;
 						chunkSize = encodedIdLength;
@@ -136,6 +135,8 @@ public class IcatClient {
 
 	private HttpClient httpClient;
 	private String sessionId;
+
+	private static final int minimumQuerySize = "entityManager?sessionId=&query=".length() + 36;  // sessionIds are 36 characters
 
 	public IcatClient(String url) {
 		this.httpClient = new HttpClient(url + "/icat");
@@ -271,12 +272,12 @@ public class IcatClient {
 			return response;
 		}
 
-		// Total limit - "entityManager?sessionId=" - `sessionId` - "?query=" - `queryPrefix` - `querySuffix
-		// Limit is 1024 - 24 - 36 - 7 - 48 - 17
-		int getUrlLimit = Integer.parseInt(Properties.getInstance().getProperty("getUrlLimit", "1024"));
-		int chunkLimit = getUrlLimit - 132;
 		String queryPrefix = "SELECT d from Datafile d WHERE d.location in (";
 		String querySuffix = ") ORDER BY d.id";
+		int getUrlLimit = Integer.parseInt(Properties.getInstance().getProperty("getUrlLimit", "1024"));
+		int queryPrefixSize = URLEncoder.encode(queryPrefix, "UTF8").length();
+		int querySuffixSize = URLEncoder.encode(querySuffix, "UTF8").length();
+		int chunkLimit = getUrlLimit - minimumQuerySize - queryPrefixSize - querySuffixSize;
 		ListIterator<String> iterator = files.listIterator();
 
 		String file = iterator.next();
@@ -287,7 +288,7 @@ public class IcatClient {
 			file = iterator.next();
 			String quotedFile = "'" + file + "'";
 			int encodedFileLength = URLEncoder.encode(quotedFile, "UTF8").length();
-			if (chunkSize + 3 + encodedFileLength > chunkLimit) {
+			if (chunkSize + 3 + encodedFileLength > chunkLimit) {  // 3 is size of , when encoded as %2C
 				response.submitDatafilesQuery(queryPrefix + chunkedFiles + querySuffix);
 
 				chunkedFiles = quotedFile;
