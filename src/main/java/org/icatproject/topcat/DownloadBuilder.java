@@ -45,10 +45,10 @@ public class DownloadBuilder {
 		queueFilesMaxFileCount = Long.valueOf(properties.getProperty("queue.files.maxFileCount", "10000"));
 
         this.sessionId = sessionId;
-        this.email = email;
         this.fileName = fileName;
 		this.transport = validateTransport(transport);
 		this.facilityName = validateFacilityName(facilityName);
+		this.email = validateEmail(transport, email);
 		String icatUrl = getIcatUrl(this.facilityName);
 
 		icatClient = new IcatClient(icatUrl, sessionId);
@@ -86,6 +86,27 @@ public class DownloadBuilder {
 		} catch (InternalException ie) {
 			throw new BadRequestException(ie.getMessage());
 		}
+	}
+
+	/**
+	 * Validate that the submitted email is not null or empty if mail.required is true.
+	 * 
+	 * @param transport Transport mechanism to use (which may require email)
+	 * @param email Users email address, which may be null or empty
+	 * @return The original email, or null if it was an empty string
+	 * @throws BadRequestException if email null or empty and mail.required is true
+	 */
+	public static String validateEmail(String transport, String email) throws BadRequestException {
+		if(email != null && email.equals("")){
+			email = null;
+		}
+
+		String emailRequired = Properties.getInstance().getProperty("mail.required." + transport, "false");
+		if (Boolean.parseBoolean(emailRequired) && email == null) {
+			throw new BadRequestException("email is required for " + transport);
+		}
+
+		return email;
 	}
 
 	/**
