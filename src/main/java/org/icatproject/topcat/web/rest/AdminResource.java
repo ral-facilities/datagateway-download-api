@@ -154,7 +154,7 @@ public class AdminResource {
      *
      * @param value the status value i.e. 'ONLINE', 'ARCHIVE' or 'RESTORING'.
      *
-     * @param customDownloadUrl Optional value to use in the email response body
+     * @param customValue Optional value to use in the email response body
      * 
      * @return an empty Response
      *
@@ -172,7 +172,7 @@ public class AdminResource {
         @FormParam("facilityName") String facilityName,
         @FormParam("sessionId") String sessionId,
         @FormParam("value") String value,
-        @FormParam("customDownloadUrl") String customDownloadUrl)
+        @FormParam("customValue") String customValue)
         throws TopcatException, MalformedURLException, ParseException {
 
         String icatUrl = getIcatUrl( facilityName );
@@ -192,9 +192,9 @@ public class AdminResource {
         }
         if(value.equals("COMPLETE")){
             download.setCompletedAt(new Date());
-            if (customDownloadUrl != null && !customDownloadUrl.equals("")) {
+            if (customValue != null && !customValue.equals("")) {
+                StatusCheck.sendDownloadReadyEmail(mailSession, download, null, customValue);
                 download.setIsEmailSent(true);
-                StatusCheck.sendDownloadReadyEmail(mailSession, download, customDownloadUrl);
             }
         }
 

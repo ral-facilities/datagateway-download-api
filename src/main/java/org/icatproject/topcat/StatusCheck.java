@@ -174,13 +174,13 @@ public class StatusCheck {
       }
       if (download.getStatus() == DownloadStatus.COMPLETE) {
     	  logger.info("Download COMPLETE for " + download.getFileName() + " " + download.getId() + "; checking whether to send email...");
-        lastChecks.remove(download.getId());
         if (!download.getIsEmailSent()) {
+          sendDownloadReadyEmail(download);
           download.setIsEmailSent(true);
           em.persist(download);
           em.flush();
-          sendDownloadReadyEmail(download);
         }
+        lastChecks.remove(download.getId());
       } else if(download.getTransport().matches("https|http") && idsClient.isPrepared(download.getPreparedId())){
     	  logger.info("Download (http[s]) for " + download.getFileName() + " " + download.getId() + " is Prepared, so setting COMPLETE and checking email...");
         download.setStatus(DownloadStatus.COMPLETE);
@@ -215,19 +215,18 @@ public class StatusCheck {
     String downloadUrl = getDownloadUrl(download.getFacilityName(),download.getTransport());
     downloadUrl += "/ids/getData?preparedId=" + download.getPreparedId();
     downloadUrl += "&outname=" + download.getFileName();
-    sendDownloadReadyEmail(mailSession, download, downloadUrl);
+    sendDownloadReadyEmail(mailSession, download, downloadUrl, null);
   }
 
   /**
-   * Send an email for a completed Download, where downloadUrl may correspond to
-   * information that is custom to the transport mechanism and not readily available
-   * from the Download fields.
+   * Send an email for a completed Download.
    * 
    * @param mailSession Jakarta mail session to use
    * @param download    Download that has completed
-   * @param downloadUrl Possibly custom value to substitute into the message body
+   * @param downloadUrl URL that provides the recipient access to their data
+   * @param customValue Custom value to substitute into the message body, set by Pollcat
    */
-  public static void sendDownloadReadyEmail(Session mailSession, Download download, String downloadUrl) {
+  public static void sendDownloadReadyEmail(Session mailSession, Download download, String downloadUrl, String customValue) {
     EmailValidator emailValidator = EmailValidator.getInstance();
     Properties properties = Properties.getInstance();
 
@@ -248,6 +247,7 @@ public class StatusCheck {
         valuesMap.put("downloadUrl", downloadUrl);
         valuesMap.put("fileName", download.getFileName());
         valuesMap.put("size", Utils.bytesToHumanReadable(download.getSize()));
+        valuesMap.put("customValue", customValue);
 
         StringSubstitutor sub = new StringSubstitutor(valuesMap);
         String subject = sub.replace(properties.getProperty("mail.subject", "mail.subject not set in run.properties"));
