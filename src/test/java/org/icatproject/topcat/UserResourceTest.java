@@ -440,62 +440,51 @@ public class UserResourceTest {
 	public void testQueueDataCollection() throws Exception {
 		System.out.println("DEBUG testQueueDataCollection");
 		List<Long> downloadIds = new ArrayList<>();
-		long finalId = 0L;
+		Long downloadIdDataset = null;
+		Long downloadIdDatafile = null;
 		try {
 			String transport = "http";
 			String email = "";
 			IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
 			JsonObject dataCollection = icatClient.getEntity("DataCollection");
 			long entityId = dataCollection.getInt("id");
-			Response response = userResource.queueDataCollection(null, sessionId, transport, null, email, entityId, true, true, true);
+			Response response = userResource.queueDataCollection(null, sessionId, transport, null, email, entityId);
 			assertEquals(200, response.getStatus());
 	
 			JsonArray downloadIdsArray = Utils.parseJsonArray(response.getEntity().toString());
-			assertEquals(302, downloadIdsArray.size());
-			long part = 1;
-			for (JsonNumber downloadIdJson : downloadIdsArray.getValuesAs(JsonNumber.class)) {
-				long downloadId = downloadIdJson.longValueExact();
-				downloadIds.add(downloadId);
-			}
-			finalId = downloadIds.remove(downloadIds.size() - 1);
-			for (long downloadId : downloadIds) {
-				Download download = downloadRepository.getDownload(downloadId);
-				assertNull(download.getPreparedId());
-				assertEquals(DownloadStatus.QUEUED, download.getStatus());
-				assertEquals(0, download.getInvestigationIds().size());
-				assertEquals(1, download.getDatasetIds().size());
-				assertEquals(0, download.getDatafileIds().size());
-				if (part < 10) {
-					assertEquals("LILS_DataCollection" + entityId + "_part_00" + part + "_of_302", download.getFileName());
-				} else if (part < 100) {
-					assertEquals("LILS_DataCollection" + entityId + "_part_0" + part + "_of_302", download.getFileName());
-				} else {
-					assertEquals("LILS_DataCollection" + entityId + "_part_" + part + "_of_302", download.getFileName());
-				}
-				assertEquals(transport, download.getTransport());
-				assertEquals("simple/root", download.getUserName());
-				assertEquals("simple/root", download.getFullName());
-				assertEquals("", download.getEmail());
-				assertNotEquals(0L, download.getSize());
-				part += 1;
-			}
-			Download download = downloadRepository.getDownload(finalId);
+			assertEquals(2, downloadIdsArray.size());
+			List<JsonNumber> downloadIdJsonNumbers = downloadIdsArray.getValuesAs(JsonNumber.class);
+			downloadIdDataset = downloadIdJsonNumbers.get(0).longValueExact();
+			downloadIdDatafile = downloadIdJsonNumbers.get(1).longValueExact();
+
+			Download download = downloadRepository.getDownload(downloadIdDataset);
+			assertNull(download.getPreparedId());
+			assertEquals(DownloadStatus.QUEUED, download.getStatus());
+			assertEquals(0, download.getInvestigationIds().size());
+			assertEquals(1, download.getDatasetIds().size());
+			assertEquals(0, download.getDatafileIds().size());
+			assertEquals("LILS_DataCollection" + entityId + "_part_1_of_2", download.getFileName());
+			assertEquals(transport, download.getTransport());
+			assertEquals("simple/root", download.getUserName());
+			assertEquals("simple/root", download.getFullName());
+			assertEquals("", download.getEmail());
+			assertNotEquals(0L, download.getSize());
+
+			download = downloadRepository.getDownload(downloadIdDatafile);
 			assertNull(download.getPreparedId());
 			assertEquals(DownloadStatus.QUEUED, download.getStatus());
 			assertEquals(0, download.getInvestigationIds().size());
 			assertEquals(0, download.getDatasetIds().size());
 			assertEquals(1, download.getDatafileIds().size());
-			assertEquals("LILS_DataCollection" + entityId + "_part_" + part + "_of_302", download.getFileName());
+			assertEquals("LILS_DataCollection" + entityId + "_part_2_of_2", download.getFileName());
 			assertEquals(transport, download.getTransport());
 			assertEquals("simple/root", download.getUserName());
 			assertEquals("simple/root", download.getFullName());
 			assertEquals("", download.getEmail());
 			assertNotEquals(0L, download.getSize());
 		} finally {
-			for (long downloadId : downloadIds) {
-				downloadRepository.removeDownload(downloadId);
-			}
-			downloadRepository.removeDownload(finalId);
+			downloadRepository.removeDownload(downloadIdDataset);
+			downloadRepository.removeDownload(downloadIdDatafile);
 		}
 	}
 

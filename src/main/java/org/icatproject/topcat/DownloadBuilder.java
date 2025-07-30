@@ -148,13 +148,9 @@ public class DownloadBuilder {
 	 * Investigations will be split into constituent Datasets.
 	 * 
 	 * @param dataCollectionId      ICAT DataCollection.id
-	 * @param extractInvestigations Whether to use the DataCollectionInvestigations
-	 * @param extractDatasets       Whether to use the DataCollectionDatasets
-	 * @param extractDatafiles      Whether to use the DataCollectionDatafiles
 	 * @throws TopcatException if querying ICAT fails
 	 */
-    public void extractDataCollection(Long dataCollectionId, Boolean extractInvestigations, Boolean extractDatasets,
-            Boolean extractDatafiles) throws TopcatException {
+    public void extractDataCollection(Long dataCollectionId) throws TopcatException {
 
 		logger.info("extractDataCollection called for {}", dataCollectionId);
 		if (dataCollectionId == null || dataCollectionId < 1) {
@@ -167,19 +163,10 @@ public class DownloadBuilder {
 
 		JsonArrayBuilder datasetsBuilder = Json.createArrayBuilder();
 		JsonArray datafiles = JsonArray.EMPTY_JSON_ARRAY;
-		if (extractInvestigations) {
-			for (JsonValue dataset : icatClient.getDataCollectionInvestigationDatasets(dataCollectionId)) {
-				datasetsBuilder.add(dataset);
-			}
+		for (JsonValue dataset : icatClient.getDataCollectionDatasets(dataCollectionId)) {
+			datasetsBuilder.add(dataset);
 		}
-		if (extractDatasets) {
-			for (JsonValue dataset : icatClient.getDataCollectionDatasets(dataCollectionId)) {
-				datasetsBuilder.add(dataset);
-			}
-		}
-		if (extractDatafiles) {
-			datafiles = icatClient.getDataCollectionDatafiles(dataCollectionId);
-		}
+		datafiles = icatClient.getDataCollectionDatafiles(dataCollectionId);
 		JsonArray datasets = datasetsBuilder.build();
 
 		if (datasets.size() == 0 && datafiles.size() == 0) {

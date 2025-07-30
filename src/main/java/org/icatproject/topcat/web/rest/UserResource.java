@@ -908,16 +908,16 @@ public class UserResource {
 	}
 
 	/**
-	 * Queue an entire visit for download, split by Dataset into part Downloads if
-	 * needed.
+	 * Queues all Datasets and Datafiles in a DataCollection for download, split into
+	 * part Downloads if needed. Investigations are not extracted.
 	 * 
-	 * @param facilityName ICAT Facility.name
-	 * @param sessionId    ICAT sessionId
-	 * @param transport    Transport mechanism to use
-	 * @param fileName     Optional name to use as the root for each individual part
-	 *                     Download. Defaults to facilityName_visitId.
-	 * @param email        Optional email to notify upon completion
-	 * @param visitId      ICAT Investigation.visitId to submit
+	 * @param facilityName     ICAT Facility.name
+	 * @param sessionId        ICAT sessionId
+	 * @param transport        Transport mechanism to use
+	 * @param fileName         Optional name to use as the root for each individual part
+	 *                         Download. Defaults to facilityName_visitId.
+	 * @param email            Optional email to notify upon completion
+	 * @param dataCollectionId ICAT DataCollection.id to submit
 	 * @return Array of Download ids
 	 * @throws TopcatException
 	 */
@@ -926,13 +926,10 @@ public class UserResource {
 	public Response queueDataCollection(@FormParam("facilityName") String facilityName,
 			@FormParam("sessionId") String sessionId, @FormParam("transport") String transport,
 			@FormParam("fileName") String fileName, @FormParam("email") String email,
-			@FormParam("dataCollectionId") Long dataCollectionId,
-			@FormParam("extractInvestigations") Boolean extractInvestigations,
-			@FormParam("extractDatasets") Boolean extractDatasets,
-			@FormParam("extractDatafiles") Boolean extractDatafiles) throws TopcatException {
+			@FormParam("dataCollectionId") Long dataCollectionId) throws TopcatException {
 
 		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, email, fileName, transport, facilityName);
-		downloadBuilder.extractDataCollection(dataCollectionId, extractInvestigations, extractDatasets, extractDatafiles);
+		downloadBuilder.extractDataCollection(dataCollectionId);
 
 		String transportUrl = getDownloadUrl(downloadBuilder.facilityName, downloadBuilder.transport);
 		IdsClient idsClient = new IdsClient(transportUrl);

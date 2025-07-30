@@ -235,24 +235,6 @@ public class IcatClient {
 	}
 
 	/**
-	 * Get all Datasets whose parent Investigation is in the specified DataCollection.
-	 * 
-	 * @param dataCollectionId ICAT DataCollection.id
-	 * @return JsonArray of Dataset fields, where each entry is a JsonArray of
-	 *         [dataset.id, dataset.fileCount, dataset.fileSize].
-	 * @throws TopcatException
-	 */
-	public JsonArray getDataCollectionInvestigationDatasets(long dataCollectionId) throws TopcatException {
-		System.out.println(dataCollectionId);
-		String query = "SELECT DISTINCT dataset.id, dataset.fileCount, dataset.fileSize";
-		query += " FROM DataCollectionInvestigation dataCollectionInvestigation";
-		query += " JOIN Investigation investigation JOIN Dataset dataset";
-		query += " WHERE dataCollectionInvestigation.dataCollection.id = " + dataCollectionId;
-		query += " ORDER BY dataset.id";
-		return submitQuery(query);
-	}
-
-	/**
 	 * Get all Datasets in the specified DataCollection.
 	 * 
 	 * @param dataCollectionId ICAT DataCollection.id
