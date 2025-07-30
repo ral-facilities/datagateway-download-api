@@ -31,6 +31,7 @@ public class DownloadBuilder {
     private String email;
     private String userName;
     private String fullName;
+	private int priority = 0;
     private IcatClient icatClient;
 
     public String transport;
@@ -54,6 +55,7 @@ public class DownloadBuilder {
 
 		userName = icatClient.getUserName();
 		fullName = icatClient.getFullName();
+		priority = icatClient.getQueuePriority(userName);
 		icatClient.checkQueueAllowed(userName);
     }
 
@@ -246,6 +248,7 @@ public class DownloadBuilder {
 		}
 		download.setDownloadItems(downloadItems);
 		download.setSize(response.totalSize);
+		download.setPriority(priority);
 		downloads.add(download);
 
 		return response;

@@ -98,11 +98,12 @@ public class UserResource {
 	 * @param plugin       ICAT authentication plugin. If null, a default value will be used.
 	 * @return json with sessionId of the form
 	 *         <samp>{"sessionId","0d9a3706-80d4-4d29-9ff3-4d65d4308a24"}</samp>
-	 * @throws BadRequestException
+	 * @throws TopcatException 
 	 */
 	@POST
 	@Path("/session")
-	public String login(@QueryParam("facilityName") String facilityName, @FormParam("username") String username, @FormParam("password") String password, @FormParam("plugin") String plugin) throws BadRequestException {
+	public String login(@QueryParam("facilityName") String facilityName, @FormParam("username") String username,
+			@FormParam("password") String password, @FormParam("plugin") String plugin) throws TopcatException {
 		if (plugin == null) {
 			plugin = defaultPlugin;
 		}
@@ -759,6 +760,7 @@ public class UserResource {
 				downloadItems.add(downloadItem);
 			}
 			download.setDownloadItems(downloadItems);
+			download.setPriority(1);
 			downloadId = submitDownload(idsClient, download, DownloadStatus.PREPARING);
 			try {
 				em.remove(cart);
@@ -849,6 +851,7 @@ public class UserResource {
 	 */
 	private long submitDownload(IdsClient idsClient, Download download, DownloadStatus downloadStatus)
 			throws TopcatException {
+
 		Boolean isTwoLevel = idsClient.isTwoLevel();
 		download.setIsTwoLevel(isTwoLevel);
 

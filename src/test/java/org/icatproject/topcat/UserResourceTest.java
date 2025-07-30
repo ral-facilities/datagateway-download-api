@@ -111,6 +111,11 @@ public class UserResourceTest {
 	}
 
 	@Test
+	public void testLoginFailure() throws Exception {
+		assertThrows(ForbiddenException.class, () -> userResource.login(null, "root", "guess", null));
+	}
+
+	@Test
 	public void testGetSize() throws Exception {
 		String facilityName = "LILS";
 		String entityType = "investigation";
@@ -575,7 +580,7 @@ public class UserResourceTest {
 		List<Long> downloadIds = new ArrayList<>();
 		try {
 			Download download = TestHelpers.createDummyDownload("simple/notroot", null, "http", true,
-					DownloadStatus.COMPLETE, false, downloadRepository);
+					DownloadStatus.COMPLETE, 0, false, downloadRepository);
 
 			downloadIds.add(download.getId());
 			Executable runnable = () -> userResource.getDownloadStatuses("LILS", sessionId, downloadIds);
@@ -592,9 +597,9 @@ public class UserResourceTest {
 		List<Long> downloadIds = new ArrayList<>();
 		try {
 			Download download1 = TestHelpers.createDummyDownload("simple/root", null, "http", true,
-					DownloadStatus.COMPLETE, false, downloadRepository);
+					DownloadStatus.COMPLETE, 0, false, downloadRepository);
 			Download download2 = TestHelpers.createDummyDownload("simple/root", null, "http", true,
-					DownloadStatus.RESTORING, false, downloadRepository);
+					DownloadStatus.RESTORING, 0, false, downloadRepository);
 
 			downloadIds.add(download1.getId());
 			downloadIds.add(download2.getId());
