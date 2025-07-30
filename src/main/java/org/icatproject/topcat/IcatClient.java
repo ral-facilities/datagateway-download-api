@@ -235,6 +235,38 @@ public class IcatClient {
 	}
 
 	/**
+	 * Get all Datasets in the specified DataCollection.
+	 * 
+	 * @param dataCollectionId ICAT DataCollection.id
+	 * @return JsonArray of Dataset fields, where each entry is a JsonArray of
+	 *         [dataset.id, dataset.fileCount].
+	 * @throws TopcatException
+	 */
+	public JsonArray getDataCollectionDatasets(long dataCollectionId) throws TopcatException {
+		String query = "SELECT dataCollectionDataset.dataset.id, dataCollectionDataset.dataset.fileCount,";
+		query += " dataCollectionDataset.dataset.fileSize FROM DataCollectionDataset dataCollectionDataset";
+		query += " WHERE dataCollectionDataset.dataCollection.id = " + dataCollectionId;
+		query += " ORDER BY dataCollectionDataset.dataset.id";
+		return submitQuery(query);
+	}
+
+	/**
+	 * Get all Datafiles in the specified DataCollection.
+	 * 
+	 * @param dataCollectionId ICAT DataCollection.id
+	 * @return JsonArray of Datafile fields, where each entry is a JsonArray of
+	 *         [datafile.id, datafile.fileSize].
+	 * @throws TopcatException
+	 */
+	public JsonArray getDataCollectionDatafiles(long dataCollectionId) throws TopcatException {
+		String query = "SELECT dataCollectionDatafile.datafile.id, dataCollectionDatafile.datafile.fileSize";
+		query += " FROM DataCollectionDatafile dataCollectionDatafile";
+		query += " WHERE dataCollectionDatafile.dataCollection.id = " + dataCollectionId;
+		query += " ORDER BY dataCollectionDatafile.datafile.id";
+		return submitQuery(query);
+	}
+
+	/**
 	 * Utility method to get the fileCount (not size) of a Dataset by COUNT of its
 	 * child Datafiles. Ideally the fileCount field should be used, this is a
 	 * fallback option if that field is not set.
@@ -326,7 +358,7 @@ public class IcatClient {
 	 */
 	public List<JsonObject> getEntities(String entityType, long limit) throws TopcatException {
 		try {
-			String entityCapital = StringUtils.capitalize(entityType.toLowerCase());
+			String entityCapital = StringUtils.capitalize(entityType);
 			String query = URLEncoder.encode("SELECT o FROM " + entityCapital + " o LIMIT 0, " + limit, "UTF8");
 			String url = "entityManager?sessionId="  + URLEncoder.encode(sessionId, "UTF8") + "&query=" + query;
 			Response response = httpClient.get(url, new HashMap<String, String>());

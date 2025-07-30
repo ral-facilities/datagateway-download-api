@@ -325,7 +325,7 @@ public class UserResourceTest {
 				assertEquals(transport, download.getTransport());
 				assertEquals("simple/root", download.getUserName());
 				assertEquals("simple/root", download.getFullName());
-				assertEquals(null, download.getEmail());
+				assertNull(download.getEmail());
 				assertNotEquals(0L, download.getSize());
 				part += 1;
 			}
@@ -395,7 +395,7 @@ public class UserResourceTest {
 			assertEquals(transport, download.getTransport());
 			assertEquals("simple/root", download.getUserName());
 			assertEquals("simple/root", download.getFullName());
-			assertEquals(null, download.getEmail());
+			assertNull(download.getEmail());
 			assertNotEquals(0L, download.getSize());
 		} finally {
 			if (downloadId != null) {
@@ -440,6 +440,58 @@ public class UserResourceTest {
 		Executable runnable = () -> userResource.queueFiles(facilityName, sessionId, transport, null, email, List.of("test"));
 		Throwable throwable = assertThrows(NotFoundException.class, runnable);
 		assertEquals("(404) : No Datafiles found", throwable.getMessage());
+	}
+
+	@Test
+	public void testQueueDataCollection() throws Exception {
+		System.out.println("DEBUG testQueueDataCollection");
+		List<Long> downloadIds = new ArrayList<>();
+		Long downloadIdDataset = null;
+		Long downloadIdDatafile = null;
+		try {
+			String transport = "http";
+			String email = "";
+			IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+			JsonObject dataCollection = icatClient.getEntity("DataCollection");
+			long entityId = dataCollection.getInt("id");
+			Response response = userResource.queueDataCollection(null, sessionId, transport, null, email, entityId);
+			assertEquals(200, response.getStatus());
+	
+			JsonArray downloadIdsArray = Utils.parseJsonArray(response.getEntity().toString());
+			assertEquals(2, downloadIdsArray.size());
+			List<JsonNumber> downloadIdJsonNumbers = downloadIdsArray.getValuesAs(JsonNumber.class);
+			downloadIdDataset = downloadIdJsonNumbers.get(0).longValueExact();
+			downloadIdDatafile = downloadIdJsonNumbers.get(1).longValueExact();
+
+			Download download = downloadRepository.getDownload(downloadIdDataset);
+			assertNull(download.getPreparedId());
+			assertEquals(DownloadStatus.QUEUED, download.getStatus());
+			assertEquals(0, download.getInvestigationIds().size());
+			assertEquals(1, download.getDatasetIds().size());
+			assertEquals(0, download.getDatafileIds().size());
+			assertEquals("LILS_DataCollection" + entityId + "_part_1_of_2", download.getFileName());
+			assertEquals(transport, download.getTransport());
+			assertEquals("simple/root", download.getUserName());
+			assertEquals("simple/root", download.getFullName());
+			assertNull(download.getEmail());
+			assertNotEquals(0L, download.getSize());
+
+			download = downloadRepository.getDownload(downloadIdDatafile);
+			assertNull(download.getPreparedId());
+			assertEquals(DownloadStatus.QUEUED, download.getStatus());
+			assertEquals(0, download.getInvestigationIds().size());
+			assertEquals(0, download.getDatasetIds().size());
+			assertEquals(1, download.getDatafileIds().size());
+			assertEquals("LILS_DataCollection" + entityId + "_part_2_of_2", download.getFileName());
+			assertEquals(transport, download.getTransport());
+			assertEquals("simple/root", download.getUserName());
+			assertEquals("simple/root", download.getFullName());
+			assertNull(download.getEmail());
+			assertNotEquals(0L, download.getSize());
+		} finally {
+			downloadRepository.removeDownload(downloadIdDataset);
+			downloadRepository.removeDownload(downloadIdDatafile);
+		}
 	}
 
 	@Test
