@@ -88,6 +88,7 @@ public class UserResourceTest {
 	private UserResource userResource;
 
 	private static String sessionId;
+	private static String nonAdminSessionId;
 
 	@BeforeAll
 	public static void beforeAll() {
@@ -101,6 +102,12 @@ public class UserResourceTest {
 				"{\"plugin\":\"simple\", \"credentials\":[{\"username\":\"root\"}, {\"password\":\"pw\"}]}", "UTF8");
 		String response = httpClient.post("session", new HashMap<String, String>(), loginData).toString();
 		sessionId = Utils.parseJsonObject(response).getString("sessionId");
+
+		loginData = "json=" + URLEncoder.encode(
+				"{\"plugin\":\"simple\", \"credentials\":[{\"username\":\"icatuser\"}, {\"password\":\"icatuserpw\"}]}",
+				"UTF8");
+		response = httpClient.post("session", new HashMap<String, String>(), loginData).toString();
+		nonAdminSessionId = Utils.parseJsonObject(response).getString("sessionId");
 	}
 
 	@Test
@@ -485,6 +492,48 @@ public class UserResourceTest {
 				downloadRepository.removeDownload(downloadId);
 			}
 		}
+	}
+
+	@Test
+	public void testSearchFiles() throws Exception {
+		System.out.println("DEBUG testSearchFiles");
+		Response response = userResource.searchFiles(null, sessionId, 100, "visitId:\"Proposal 0 - 0 0\"", null);
+		assertEquals(200, response.getStatus());
+		JsonObject responseObject = Utils.parseJsonObject(response.getEntity().toString());
+		JsonArray results = responseObject.getJsonArray("results");
+		String firstSearchAfter = responseObject.getJsonObject("search_after").toString();
+		assertEquals(100, results.size());
+		assertNotNull(firstSearchAfter);
+
+		// If maxResults is not provided, it will default to 0 and then should use the queue.maxFileCount value of 3
+		response = userResource.searchFiles(null, sessionId, 0, "+visitId:\"Proposal 0 - 0 0\"", firstSearchAfter);
+		assertEquals(200, response.getStatus());
+		responseObject = Utils.parseJsonObject(response.getEntity().toString());
+		results = responseObject.getJsonArray("results");
+		String secondSearchAfter = responseObject.getJsonObject("search_after").toString();
+		assertEquals(3, results.size());
+		assertNotNull(secondSearchAfter);
+		assertNotEquals(firstSearchAfter, secondSearchAfter);  // Indicates we've made progress with the search
+	}
+
+	@Test
+	public void testSearchFilesUnauthorized() throws Exception {
+		System.out.println("DEBUG testSearchFilesUnauthorized");
+		// This user is not on any of the investigations, so should not see any results
+		Response response = userResource.searchFiles(null, nonAdminSessionId, 100, "visitId:\"Proposal - 0 0\"", null);
+		assertEquals(200, response.getStatus());
+		JsonObject responseObject = Utils.parseJsonObject(response.getEntity().toString());
+		JsonArray results = responseObject.getJsonArray("results");
+		JsonObject searchAfter = responseObject.getJsonObject("search_after");
+		assertEquals(0, results.size());
+		assertNull(searchAfter);
+	}
+
+	@Test
+	public void testSearchFilesMaxResultsExceeded() throws Exception {
+		System.out.println("DEBUG testSearchFilesMaxResultsExceeded");
+		Executable executable = () -> userResource.searchFiles(null, sessionId, 10001, "visitId:\"Proposal - 0 0\"", null);
+		assertThrows(BadRequestException.class, executable);
 	}
 
 	@Test

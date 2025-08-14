@@ -156,6 +156,11 @@ queue.priority.investigationUser.default = 4
 queue.priority.authenticated = {"orcid": 6, "anon": 0}
 queue.priority.default = 5
 
+# Whether the API endpoint perform Lucene searches is enabled
+search.enabled = false
+# The maximum number of results to return in a single request to the Lucene component
+search.maxResults = 10000
+
 # Configurable limit for the length of the GET URL for requesting Datafiles by a list of file locations
 # The exact limit may depend on the server
 getUrlLimit=1024
