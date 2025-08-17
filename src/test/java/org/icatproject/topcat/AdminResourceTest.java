@@ -247,7 +247,7 @@ public class AdminResourceTest {
 			Download testDownload = new Download();
 			String facilityName = "LILS";
 			testDownload.setFacilityName(facilityName);
-			testDownload.setSessionId(adminSessionId);
+			testDownload.setSessionId("sessionId");
 			testDownload.setStatus(DownloadStatus.QUEUED);
 			testDownload.setIsDeleted(false);
 			testDownload.setUserName("simple/root");
@@ -265,6 +265,7 @@ public class AdminResourceTest {
 
 			testDownload = findDownload(downloads, downloadId);
 			assertEquals(DownloadStatus.PREPARING, testDownload.getStatus());
+			assertEquals(adminSessionId, testDownload.getSessionId());
 		} finally {
 			if (downloadId != null) {
 				downloadRepository.removeDownload(downloadId);
