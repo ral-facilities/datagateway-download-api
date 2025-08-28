@@ -184,13 +184,19 @@ public class AdminResource {
             throw new NotFoundException("could not find download");
         }
 
-        if (download.getStatus().equals(DownloadStatus.QUEUED) && value.equals("RESTORING")) {
+        DownloadStatus downloadStatus = DownloadStatus.valueOf(value);
+        if (download.getStatus().equals(DownloadStatus.QUEUED) && downloadStatus.equals(DownloadStatus.RESTORING)) {
             // Queued jobs need to be marked PREPARING first to generate a preparedId before RESTORING
-            download.setStatus(DownloadStatus.PREPARING);
-        } else {
-            download.setStatus(DownloadStatus.valueOf(value));
+            downloadStatus = DownloadStatus.PREPARING;
         }
-        if(value.equals("COMPLETE")){
+        download.setStatus(downloadStatus);
+        if (downloadStatus.equals(DownloadStatus.PREPARING)) {
+            // Downloads in the preparing state will result in a call to the ids which requires an active sessionId.
+            // The contents of the Download should have already been authorized when it was created, and the /prepare
+            // method also uses the admin's sessionId in the call to the IDS.
+            download.setSessionId(sessionId);
+        }
+        if(downloadStatus.equals(DownloadStatus.COMPLETE)){
             download.setCompletedAt(new Date());
             if (customValue != null && !customValue.equals("")) {
                 StatusCheck.sendDownloadReadyEmail(mailSession, download, null, customValue);
