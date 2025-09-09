@@ -1,5 +1,27 @@
 # Release Notes
 
+## 3.2.0
+
+  * Catch exceptions in CacheRepository.prune()
+  * Upgrade to JUnit 5.
+  * Support authenticator prefix as a factor for priority and whether individual transport mechanisms are allowed.
+  * Persist priority for queued Downloads.
+  * Implement endpoint to POST /queue/dataCollection.
+  * Support transport mechanisms which require email to be set.
+  * Add error handling to UserResource.login().
+  * Enforce cart size and count limits in the submitCart endpoint.
+  * Use admin's sessionId when setting DownloadStatus to PREPARING.
+
+## 3.1.0 (19th May 2025)
+
+  * Implement endpoints for queuing and chunking of large Downloads for lists of filepaths or visit IDs.
+  * Implement login endpoint.
+  * Implement endpoint to GET /downloads/status.
+  * Implement endpoint to GET /queue/allowed for the requesting user.
+  * Configuration option to block anonymous users from submitting carts.
+  * Implement endpoint to POST /admin/download/{id}/prepare and refactor corresponding functionality out of admin script.
+  * Add new options to admins scripts to (re)submit, cancel, and query for queued Downloads
+
 ## 3.0.1 (3rd July 2023)
 
   * Update logback-classic to 2.1.12
