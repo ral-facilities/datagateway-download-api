@@ -497,13 +497,20 @@ public class UserResourceTest {
 	@Test
 	public void testSearchFiles() throws Exception {
 		System.out.println("DEBUG testSearchFiles");
+		double expectedScore = 1.9460127353668213;
 		Response response = userResource.searchFiles(null, sessionId, 100, "visitId:\"Proposal 0 - 0 0\"", null);
 		assertEquals(200, response.getStatus());
 		JsonObject responseObject = Utils.parseJsonObject(response.getEntity().toString());
 		JsonArray results = responseObject.getJsonArray("results");
 		String firstSearchAfter = responseObject.getJsonObject("search_after").toString();
 		assertEquals(100, results.size());
-		assertNotNull(firstSearchAfter);
+		JsonObject firstSearchAfterObject = Utils.parseJsonObject(firstSearchAfter);
+		JsonArray firstFields = firstSearchAfterObject.getJsonArray("fields");
+		int firstDoc = firstSearchAfterObject.getJsonNumber("doc").intValueExact();
+		long firstIcatId = firstFields.getJsonNumber(1).longValueExact();
+		assertEquals(0, firstSearchAfterObject.getJsonNumber("shardIndex").intValueExact());
+		assertEquals(expectedScore, firstSearchAfterObject.getJsonNumber("score").doubleValue());
+		assertEquals(expectedScore, firstFields.getJsonNumber(0).doubleValue());
 
 		// If maxResults is not provided, it will default to 0 and then should use the queue.maxFileCount value of 3
 		response = userResource.searchFiles(null, sessionId, 0, "+visitId:\"Proposal 0 - 0 0\"", firstSearchAfter);
@@ -512,8 +519,13 @@ public class UserResourceTest {
 		results = responseObject.getJsonArray("results");
 		String secondSearchAfter = responseObject.getJsonObject("search_after").toString();
 		assertEquals(3, results.size());
-		assertNotNull(secondSearchAfter);
-		assertNotEquals(firstSearchAfter, secondSearchAfter);  // Indicates we've made progress with the search
+		JsonObject secondSearchAfterObject = Utils.parseJsonObject(secondSearchAfter);
+		JsonArray secondFields = secondSearchAfterObject.getJsonArray("fields");
+		assertEquals(0, secondSearchAfterObject.getJsonNumber("shardIndex").intValueExact());
+		assertEquals(expectedScore, secondSearchAfterObject.getJsonNumber("score").doubleValue());
+		assertEquals(expectedScore, secondFields.getJsonNumber(0).doubleValue());
+		assertEquals(firstDoc + 3, secondSearchAfterObject.getJsonNumber("doc").intValueExact());
+		assertEquals(firstIcatId + 3, secondFields.getJsonNumber(1).longValueExact());
 	}
 
 	@Test
