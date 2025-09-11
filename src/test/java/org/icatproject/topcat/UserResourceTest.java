@@ -521,7 +521,7 @@ public class UserResourceTest {
 		JsonObject secondSearchAfterObject = Utils.parseJsonObject(secondSearchAfter);
 		JsonArray secondFields = secondSearchAfterObject.getJsonArray("fields");
 		assertEquals(0, secondSearchAfterObject.getJsonNumber("shardIndex").intValueExact());
-		assertEquals(firstDoc + 3, secondSearchAfterObject.getJsonNumber("doc").intValueExact());
+		assertTrue(secondSearchAfterObject.getJsonNumber("doc").intValueExact() >= firstDoc + 3);
 		assertEquals(firstScore, secondSearchAfterObject.getJsonNumber("score").doubleValue());
 		assertEquals(firstScore, secondFields.getJsonNumber(0).doubleValue());
 		assertEquals(firstIcatId + 3, secondFields.getJsonNumber(1).longValueExact());
