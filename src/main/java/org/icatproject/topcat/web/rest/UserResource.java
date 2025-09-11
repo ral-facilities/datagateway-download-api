@@ -33,6 +33,7 @@ import jakarta.ws.rs.DefaultValue;
 
 import org.icatproject.topcat.domain.*;
 import org.icatproject.topcat.exceptions.*;
+import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +70,9 @@ public class UserResource {
 
 	private String anonUserName;
 	private String defaultPlugin;
+	private boolean queryEnabled;
+	private int maxResults;
+	private int maxFileCount;
 
 	@PersistenceContext(unitName = "topcat")
 	EntityManager em;
@@ -77,6 +81,9 @@ public class UserResource {
 		Properties properties = Properties.getInstance();
 		this.anonUserName = properties.getProperty("anonUserName", "");
 		this.defaultPlugin = properties.getProperty("defaultPlugin", "simple");
+		this.queryEnabled = Boolean.valueOf(properties.getProperty("search.enabled", "false"));
+		this.maxResults = Integer.valueOf(properties.getProperty("search.maxResults", "10000"));
+		this.maxFileCount = Integer.valueOf(properties.getProperty("queue.files.maxFileCount", "10000"));
     }
 
 	/**
@@ -1028,6 +1035,74 @@ public class UserResource {
 		jsonObjectBuilder.add("downloadId", downloadId);
 		jsonObjectBuilder.add("notFound", jsonArrayBuilder);
 		return Response.ok(jsonObjectBuilder.build()).build();
+	}
+
+	/**
+	 * Perform a search using the icat.lucene component for Datafile.locations, so that
+	 * these can then be used with the /queue/files endpoint.
+	 * 
+	 * Must be explicitly enabled by the run.properties.
+	 * 
+	 * @param facilityName ICAT Facility.name
+	 * @param sessionId    ICAT sessionId
+	 * @param maxResults   The number of results to request in this batch. If there are
+	 *                     more matching Datafiles, these should be requested separately
+	 *                     using searchAfter.
+	 * @param query        Query using Lucene syntax and supported Datafile fields.
+	 * @param searchAfter  Optionally ignore initial results and return those after the
+	 *                     Datafile represented by this object. For use when
+	 *                     batching/paginating results.
+	 * @return The Datafile.location of matching results, plus the searchAfter object
+	 *         for subsequent searches if the final result wasn't reached.
+	 * @throws Exception If authentication fails, more than the configured maxResults
+	 *                   requested, or if the underlying search fails.
+	 */
+	@POST
+	@Path("/search/files")
+	public Response searchFiles(@QueryParam("facilityName") String facilityName,
+			@QueryParam("sessionId") String sessionId, @QueryParam("maxResults") int maxResults,
+			@FormParam("query") String query, @FormParam("searchAfter") String searchAfter) throws Exception {
+
+		if (!queryEnabled) {
+			throw new BadRequestException("Querying not enabled");
+		}
+		FacilityMap facilityMap = FacilityMap.getInstance();
+		facilityName = facilityMap.validateFacilityName(facilityName);
+		String icatUrl = facilityMap.getIcatUrl(facilityName);
+		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
+		String userName = icatClient.getUserName();
+
+		if (maxResults > this.maxResults) {
+			throw new BadRequestException("maxResults cannot exceed " + this.maxResults);
+		} else if (maxResults < 1) {
+			maxResults = Math.min(this.maxResults, maxFileCount);
+		}
+		String queryParameters = "?maxResults=" + maxResults;
+		if (searchAfter != null && !searchAfter.equals("")) {
+			queryParameters += "&search_after=" + searchAfter;
+		}
+
+		JsonArrayBuilder fieldsBuilder = Json.createArrayBuilder();
+		fieldsBuilder.add("location");
+		JsonObjectBuilder queryBuilder = Json.createObjectBuilder();
+		queryBuilder.add("text", query);
+		if (!icatClient.isAdmin()) {
+			queryBuilder.add("user", userName);
+		}
+		JsonObjectBuilder bodyBuilder = Json.createObjectBuilder();
+		bodyBuilder.add("fields", fieldsBuilder);
+		bodyBuilder.add("query", queryBuilder);
+		String body = bodyBuilder.build().toString();
+
+		HttpClient httpClient = new HttpClient(icatUrl + "/icat.lucene");
+		String path = "datafile" + queryParameters;
+		String contentType = "application/json; charset=utf-8";
+		org.icatproject.topcat.httpclient.Response response = httpClient.post(path, Map.of(), body, contentType);
+
+		if (response.getCode() != 200) {
+			throw new TopcatException(response.getCode(), response.toString());
+		}
+		return Response.ok(response.toString()).build();
 	}
 
 	/**
