@@ -8,7 +8,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+import java.util.Map.Entry;
 
 import jakarta.ejb.EJB;
 import jakarta.ejb.LocalBean;
@@ -1194,22 +1194,31 @@ public class UserResource {
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 		String userName = icatClient.getUserName();
 		TransportMap transportMap = TransportMap.getInstance();
+		HashMap<String, TransportMechanism> facilityMapping = transportMap.getFacilityMapping(facilityName);
 
 		JsonObjectBuilder responseJson = Json.createObjectBuilder();
-		List<DownloadType> downloadTypes = downloadTypeRepository.getDownloadTypes(facilityName);
-		for (DownloadType downloadType : downloadTypes) {
-			String downloadTypeName = downloadType.getDownloadType();
-			if (transportMap.isAllowed(facilityName, downloadTypeName, userName, icatClient)) {
-				JsonObjectBuilder downloadTypeBuilder = Json.createObjectBuilder();
-				downloadTypeBuilder.add("disabled", downloadType.getDisabled());
-				downloadTypeBuilder.add("message", downloadType.getMessage());
-				TransportMechanism transportMechanism = transportMap.getTransportMechanism(facilityName, downloadTypeName);
-				if (transportMechanism != null) {
-					downloadTypeBuilder.add("idsUrl", transportMechanism.idsUrl);
-					downloadTypeBuilder.add("displayName", transportMechanism.displayName);
-					downloadTypeBuilder.add("description", transportMechanism.description);
+		if (facilityMapping != null) {
+			for (Entry<String, TransportMechanism> entry : facilityMapping.entrySet()) {
+				String downloadTypeName = entry.getKey();
+				TransportMechanism transportMechanism = entry.getValue();
+				if (transportMap.isAllowed(facilityName, downloadTypeName, userName, icatClient)) {
+					JsonObjectBuilder downloadTypeBuilder = Json.createObjectBuilder();
+					if (transportMechanism != null) {
+						downloadTypeBuilder.add("idsUrl", transportMechanism.idsUrl);
+						downloadTypeBuilder.add("displayName", transportMechanism.displayName);
+						downloadTypeBuilder.add("description", transportMechanism.description);
+					}
+
+					DownloadType downloadType = downloadTypeRepository.getDownloadType(facilityName, downloadTypeName);
+					if (downloadType != null) {
+						downloadTypeBuilder.add("disabled", downloadType.getDisabled());
+						downloadTypeBuilder.add("message", downloadType.getMessage());
+					} else {
+						downloadTypeBuilder.add("disabled", false);
+						downloadTypeBuilder.add("message", "");
+					}
+					responseJson.add(downloadTypeName, downloadTypeBuilder);
 				}
-				responseJson.add(downloadTypeName, downloadTypeBuilder);
 			}
 		}
 
