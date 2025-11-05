@@ -7,6 +7,7 @@ import java.util.HashMap;
 
 import org.icatproject.topcat.httpclient.HttpClient;
 import org.icatproject.topcat.httpclient.Response;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import jakarta.json.Json;
@@ -16,6 +17,12 @@ import jakarta.json.JsonObject;
 import jakarta.json.JsonObjectBuilder;
 
 public class TransportMapTest {
+
+	@BeforeAll
+	public static void beforeAll() {
+		TestHelpers.installTrustManager();
+	}
+
     @Test
     public void testTransportMap() throws Exception {
         System.out.println("DEBUG: testTransportMap");
