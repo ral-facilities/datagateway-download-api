@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Setup Java
-        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
         with:
           distribution: 'temurin'
           java-version: ${{ matrix.java_version }}
@@ -97,28 +97,28 @@ jobs:
 
       # Upload logs on failure
       - name: Upload DataGatewayDownload API log
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: ${{ failure() }}
         with:
           name: DataGatewayDownload API logs
           path: /home/runner/logs/datagateway-download-api.log
 
       - name: Upload IDS log
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: ${{ failure() }}
         with:
           name: IDS logs
           path: /home/runner/logs/ids.log
 
       - name: Upload ICAT log
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: ${{ failure() }}
         with:
           name: ICAT logs
           path: /home/runner/logs/icat.log
 
       - name: Payara logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: ${{ failure() }}
         with:
           name: Payara logs
