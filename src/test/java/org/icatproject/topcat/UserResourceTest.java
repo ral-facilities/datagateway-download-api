@@ -262,6 +262,7 @@ public class UserResourceTest {
 		}
 		assertEquals(fileName, newDownload.getFileName());
 		assertFalse(newDownload.getIsDeleted());
+		assertEquals(1, newDownload.getPriority());
 
 		// Next, change the download status. Must be different from the current status!
 		String downloadStatus = "EXPIRED";
@@ -417,6 +418,7 @@ public class UserResourceTest {
 				assertEquals("simple/root", download.getFullName());
 				assertNull(download.getEmail());
 				assertNotEquals(0L, download.getSize());
+				assertEquals(2, download.getPriority());
 				part += 1;
 			}
 		} finally {
@@ -487,6 +489,7 @@ public class UserResourceTest {
 			assertEquals("simple/root", download.getFullName());
 			assertNull(download.getEmail());
 			assertNotEquals(0L, download.getSize());
+			assertEquals(2, download.getPriority());
 		} finally {
 			if (downloadId != null) {
 				downloadRepository.removeDownload(downloadId);
@@ -618,6 +621,7 @@ public class UserResourceTest {
 			assertEquals("simple/root", download.getFullName());
 			assertNull(download.getEmail());
 			assertNotEquals(0L, download.getSize());
+			assertEquals(2, download.getPriority());
 
 			download = downloadRepository.getDownload(downloadIdDatafile);
 			assertNull(download.getPreparedId());
@@ -631,6 +635,7 @@ public class UserResourceTest {
 			assertEquals("simple/root", download.getFullName());
 			assertNull(download.getEmail());
 			assertNotEquals(0L, download.getSize());
+			assertEquals(2, download.getPriority());
 		} finally {
 			downloadRepository.removeDownload(downloadIdDataset);
 			downloadRepository.removeDownload(downloadIdDatafile);

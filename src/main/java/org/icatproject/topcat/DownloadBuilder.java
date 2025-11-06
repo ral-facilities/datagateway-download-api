@@ -143,6 +143,7 @@ public class DownloadBuilder {
 		download.setFullName(fullName);
 		download.setTransport(transport);
 		download.setEmail(email);
+		download.setPriority(priority);
 		download.setIsEmailSent(false);
 		download.setSize(0);
 		return download;
@@ -256,7 +257,6 @@ public class DownloadBuilder {
 		}
 		download.setDownloadItems(downloadItems);
 		download.setSize(response.totalSize);
-		download.setPriority(priority);
 		downloads.add(download);
 
 		return response;
