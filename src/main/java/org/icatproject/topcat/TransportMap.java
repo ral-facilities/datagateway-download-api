@@ -138,6 +138,14 @@ public class TransportMap {
     }
 
     /**
+     * @param facilityName ICAT Facility.name
+     * @return Map of transport mechanism (AKA DownloadType) name to details of that mechanism
+     */
+    public HashMap<String, TransportMechanism> getFacilityMapping(String facilityName) {
+        return mapping.get(facilityName);
+    }
+
+    /**
      * 
      * @param facilityName ICAT Facility.name
      * @param transport    Name of the DownloadType, AKA TransportMechanism

@@ -728,13 +728,8 @@ public class UserResourceTest {
 			downloadTypeRepository.save(httpType);
 			httpTypeId = httpType.getId();
 
-			DownloadType globusType = new DownloadType();
-			globusType.setFacilityName("LILS");
-			globusType.setDownloadType("globus");
-			globusType.setDisabled(false);
-			globusType.setMessage("");
-			downloadTypeRepository.save(globusType);
-			globusTypeId = globusType.getId();
+			// Do not create globus in the repository, as when absent the response should assume that it is enabled with
+			// no message
 
 			DownloadType lilsType = new DownloadType();
 			lilsType.setFacilityName("LILS");
@@ -774,7 +769,6 @@ public class UserResourceTest {
 		} finally {
 			// Remove the entries we created to avoid interference with other tests
 			downloadTypeRepository.remove(httpTypeId);
-			downloadTypeRepository.remove(globusTypeId);
 			downloadTypeRepository.remove(lilsTypeId);
 		}
 	}
