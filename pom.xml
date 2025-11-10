@@ -5,7 +5,7 @@
 	<groupId>org.icatproject</groupId>
 	<artifactId>datagateway-download-api</artifactId>
 	<packaging>war</packaging>
-	<version>3.2.0</version>
+	<version>3.2.1-SNAPSHOT</version>
 	<name>DataGateway Download API</name>
 	<description>Download backend for DataGateway</description>
 
@@ -289,7 +289,7 @@
 		<connection>scm:git:https://github.com/ral-facilities/datagateway-download-api.git</connection>
 		<developerConnection>scm:git:https://github.com/ral-facilities/datagateway-download-api.git</developerConnection>
 		<url>https://github.com/ral-facilities/datagateway-download-api</url>
-		<tag>v3.2.0</tag>
+		<tag>HEAD</tag>
 	</scm>
 
 
