@@ -1,6 +1,6 @@
 # Release Notes
 
-## 3.2.0
+## 3.2.0 (10th November 2025)
 
   * Catch exceptions in CacheRepository.prune()
   * Upgrade to JUnit 5.
@@ -11,6 +11,7 @@
   * Add error handling to UserResource.login().
   * Enforce cart size and count limits in the submitCart endpoint.
   * Use admin's sessionId when setting DownloadStatus to PREPARING.
+  * Implement endpoint to POST /search/files
 
 ## 3.1.0 (19th May 2025)
 
