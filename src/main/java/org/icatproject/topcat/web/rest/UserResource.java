@@ -73,6 +73,17 @@ public class UserResource {
 	private boolean queryEnabled;
 	private int maxResults;
 	private int maxFileCount;
+	private boolean queueCarts;
+
+	/**
+	 * Only used for testing.
+	 * 
+	 * @param queueCarts
+	 */
+	public void setQueueCarts(boolean queueCarts) {
+		this.queueCarts = queueCarts;
+		System.out.println("set: " + this.queueCarts);
+	}
 
 	@PersistenceContext(unitName = "topcat")
 	EntityManager em;
@@ -84,6 +95,7 @@ public class UserResource {
 		this.queryEnabled = Boolean.valueOf(properties.getProperty("search.enabled", "false"));
 		this.maxResults = Integer.valueOf(properties.getProperty("search.maxResults", "10000"));
 		this.maxFileCount = Integer.valueOf(properties.getProperty("queue.files.maxFileCount", "10000"));
+		this.queueCarts = Boolean.valueOf(properties.getProperty("queue.carts", "false"));
     }
 
 	/**
@@ -798,8 +810,16 @@ public class UserResource {
 				downloadItems.add(downloadItem);
 			}
 			download.setDownloadItems(downloadItems);
-			download.setPriority(1);
-			downloadId = submitDownload(idsClient, download, DownloadStatus.PREPARING);
+
+			int priority = 1;
+			DownloadStatus downloadStatus = DownloadStatus.PREPARING;
+			if (queueCarts) {
+				priority = icatClient.getQueuePriority(userName);
+				downloadStatus = DownloadStatus.QUEUED;
+			}
+			download.setPriority(priority);
+			downloadId = submitDownload(idsClient, download, downloadStatus);
+
 			try {
 				em.remove(cart);
 				em.flush();

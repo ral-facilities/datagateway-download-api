@@ -307,6 +307,49 @@ public class UserResourceTest {
 		assertTrue(newDownload.getIsDeleted());
 	}
 
+	@Test
+	public void testSubmitQueuedCart() throws Exception {
+		System.out.println("DEBUG testSubmitQueuedCart");
+		Long downloadId = null;
+		try {
+			userResource.setQueueCarts(true);
+			String facilityName = "LILS";
+			String transport = "http";
+			String email = "";
+			String filename = "filename";
+			String zipType = "ZIP";
+			IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+			JsonObject dataset = icatClient.getEntity("dataset");
+			long entityId = dataset.getInt("id");
+			Response response = userResource.addCartItems(facilityName, sessionId, "dataset " + entityId, false);
+			assertEquals(200, response.getStatus());
+
+			response = userResource.submitCart(facilityName, sessionId, transport, email, filename, zipType);
+			assertEquals(200, response.getStatus());
+	
+			JsonObject json = Utils.parseJsonObject(response.getEntity().toString());
+			assertEquals(0, json.getJsonArray("cartItems").size());
+			downloadId = json.getJsonNumber("downloadId").longValueExact();
+			Download download = downloadRepository.getDownload(downloadId);
+			assertNull(download.getPreparedId());
+			assertEquals(DownloadStatus.QUEUED, download.getStatus());
+			assertEquals(0, download.getInvestigationIds().size());
+			assertEquals(1, download.getDatasetIds().size());
+			assertEquals(0, download.getDatafileIds().size());
+			assertEquals(filename, download.getFileName());
+			assertEquals(transport, download.getTransport());
+			assertEquals("simple/root", download.getUserName());
+			assertEquals("simple/root", download.getFullName());
+			assertNull(download.getEmail());
+			assertEquals(2, download.getPriority());
+		} finally {
+			userResource.setQueueCarts(false);
+			if (downloadId != null) {
+				downloadRepository.removeDownload(downloadId);
+			}
+		}
+	}
+
 	private void submitCartFailure(String entityType, String field) throws Exception {
 		String facilityName = "LILS";
 		HttpClient httpClient = new HttpClient("https://localhost:8181/icat");
