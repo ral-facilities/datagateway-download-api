@@ -82,7 +82,6 @@ public class UserResource {
 	 */
 	public void setQueueCarts(boolean queueCarts) {
 		this.queueCarts = queueCarts;
-		System.out.println("set: " + this.queueCarts);
 	}
 
 	@PersistenceContext(unitName = "topcat")
