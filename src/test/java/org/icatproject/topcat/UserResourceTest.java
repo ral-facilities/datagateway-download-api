@@ -312,6 +312,14 @@ public class UserResourceTest {
 		System.out.println("DEBUG testSubmitQueuedCart");
 		Long downloadId = null;
 		try {
+			MockProperties props = new MockProperties();
+			props.setMockProperty("facility.list", "LILS");
+			props.setMockProperty("facility.LILS.icatUrl", "https://localhost:8181");
+			props.setMockProperty("facility.LILS.idsUrl", "https://localhost:8181");
+			props.setMockProperty("facility.LILS.limit.count", "250000");
+			props.setMockProperty("facility.LILS.limit.size", "10000000000000");
+			FacilityMap facilityMap = new FacilityMap(props);
+			FacilityMap.setInstance(facilityMap);
 			userResource.setQueueCarts(true);
 			String facilityName = "LILS";
 			String transport = "http";
@@ -343,6 +351,7 @@ public class UserResourceTest {
 			assertNull(download.getEmail());
 			assertEquals(2, download.getPriority());
 		} finally {
+			FacilityMap.setInstance(null);
 			userResource.setQueueCarts(false);
 			if (downloadId != null) {
 				downloadRepository.removeDownload(downloadId);
