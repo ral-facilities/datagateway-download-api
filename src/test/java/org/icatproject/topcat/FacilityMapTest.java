@@ -3,42 +3,11 @@ package org.icatproject.topcat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.icatproject.topcat.exceptions.InternalException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
 public class FacilityMapTest {
-	
-	// A class to mock the Topcat Properties class
-	// We will use it to construct both  good and bad property sets.
-	
-	private class MockProperties extends Properties {
-		
-		private Map<String,String> props;
-		
-		public MockProperties() {
-			props = new HashMap<String,String>();
-		}
-		
-		public void setMockProperty( String propName, String value ) {
-			props.put(propName, value);
-		}
-		
-		public String getProperty( String propertyName ) {
-			return props.get(propertyName);
-		}
-		
-		public String getProperty( String propertyName, String defaultValue ) {
-			String value = props.get(propertyName);
-			if( value == null ) {
-				value = defaultValue;
-			}
-			return value;
-		}
-	}
 	
 	@Test
 	public void testSimpleConstruction() throws InternalException {

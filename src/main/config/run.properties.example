@@ -136,6 +136,10 @@ queue.visit.maxPartFileCount = 10000
 # Any chunking should be done clientside
 queue.files.maxFileCount = 10000
 
+# If True, then submitted carts will enter the QUEUED state with an appropriate priority level.
+# Otherwise, they will start immediately (historic behaviour).
+queue.carts = False
+
 # When queueing Downloads a positive priority will allow a User to proceed.
 # Non-positive values will block that User from submitting a request to the queue.
 # When automatically moving jobs from the queued to the PREPARING state, all Downloads
