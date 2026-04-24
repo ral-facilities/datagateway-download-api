@@ -46,6 +46,18 @@ public class IcatClient {
 				totalSize += datafile.getJsonNumber("fileSize").longValueExact();
 			}
 		}
+
+		/**
+		 * @return JsonObject in the format
+		 *         {"totalCount": 0, "totalSize": 0, "notFound": []}.
+		 */
+		public JsonObject buildSizeResponseBody() {
+			JsonObjectBuilder builder = Json.createObjectBuilder();
+			builder.add("totalCount", ids.size());
+			builder.add("totalSize", totalSize);
+			builder.add("notFound", Json.createArrayBuilder(missing));
+			return builder.build();
+		}
 	}
 
 	/**
@@ -275,6 +287,19 @@ public class IcatClient {
 	}
 
 	/**
+	 * Get the Investigations with the specified visitId.
+	 * 
+	 * @param visitId ICAT Investigation.visitId
+	 * @return JsonArray of Investigation fields, where each entry is a JsonArray of
+	 *         [investigation.id, investigation.fileCount, investigation.fileSize].
+	 * @throws TopcatException
+	 */
+	public JsonArray getInvestigation(String visitId) throws TopcatException {
+		String query = "SELECT i.id, i.fileCount, i.fileSize from Investigation i WHERE i.visitId = '" + visitId + "'";
+		return submitQuery(query);
+	}
+
+	/**
 	 * Get all Datasets whose parent Investigation has the specified visitId.
 	 * 
 	 * @param visitId ICAT Investigation.visitId
@@ -367,6 +392,41 @@ public class IcatClient {
 		query += " WHERE dataCollectionDatafile.dataCollection.id = " + dataCollectionId;
 		query += " ORDER BY dataCollectionDatafile.datafile.id";
 		return submitQuery(query);
+	}
+
+	/**
+	 * Utility method to get the fileCount (not size) of an Investigation by COUNT
+	 * of its child Datafiles. Ideally the fileCount field should be used, this is
+	 * a fallback option if that field is not set.
+	 * 
+	 * @param investigationId ICAT Investigation.id
+	 * @return The number of Datafiles in the specified Investigation
+	 * @throws TopcatException
+	 */
+	public long getInvestigationFileCount(long investigationId) throws TopcatException {
+		String query = "SELECT COUNT(d) FROM Datafile d WHERE d.dataset.investigation.id = " + investigationId;
+		JsonArray jsonArray = submitQuery(query);
+		return jsonArray.getJsonNumber(0).longValueExact();
+	}
+
+	/**
+	 * Utility method to get the fileSize (not size) of an Investigation by
+	 * SELECTing its child Datafiles. Ideally the fileSize field should be used,
+	 * this is a fallback option if that field is not set.
+	 * 
+	 * @param investigationId ICAT Investigation.id
+	 * @return The total size of Datafiles in the specified Investigation
+	 * @throws TopcatException
+	 */
+	public long getInvestigationFileSize(long investigationId) throws TopcatException {
+		String query = "SELECT SUM(d.fileSize) FROM Datafile d WHERE d.dataset.investigation.id = " + investigationId;
+		JsonArray jsonArray = submitQuery(query);
+		if (jsonArray.get(0).getValueType().equals(ValueType.NUMBER)) {
+			return jsonArray.getJsonNumber(0).longValueExact();
+		} else {
+			// SUM will be null if there are no matching Datafiles, so return 0
+			return 0L;
+		}
 	}
 
 	/**
@@ -585,6 +645,7 @@ public class IcatClient {
 	 * @throws TopcatException
 	 */
 	public int getQueuePriority(String userName) throws TopcatException {
+		logger.debug("Get priority for {}", userName);
 		PriorityMap priorityMap = PriorityMap.getInstance();
 		Integer userPriority = priorityMap.getUserPriority(userName);
 		if (userPriority != null) {

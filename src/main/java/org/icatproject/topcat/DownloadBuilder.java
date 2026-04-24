@@ -18,6 +18,8 @@ import org.slf4j.LoggerFactory;
 import jakarta.json.Json;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonArrayBuilder;
+import jakarta.json.JsonObject;
+import jakarta.json.JsonObjectBuilder;
 import jakarta.json.JsonValue;
 
 public class DownloadBuilder {
@@ -39,14 +41,21 @@ public class DownloadBuilder {
     public String fileName;
 	public final List<Download> downloads = new ArrayList<Download>();
 
-    public DownloadBuilder(String sessionId, String email, String fileName, String transport, String facilityName) throws TopcatException {
+	/**
+	 * Initialise with minimal settings to performing querying for a potential
+	 * queued Download, but not actually submitting it.
+	 * 
+	 * @param sessionId    ICAT sessionId.
+	 * @param facilityName ICAT Facility.name.
+	 * @throws TopcatException if facilityName is invalid, or queueing not allowed
+	 *                         for this sessionId.
+	 */
+	public DownloadBuilder(String sessionId, String facilityName) throws TopcatException {
 		Properties properties = Properties.getInstance();
 		queueVisitMaxPartFileCount = Long.valueOf(properties.getProperty("queue.visit.maxPartFileCount", "10000"));
 		queueFilesMaxFileCount = Long.valueOf(properties.getProperty("queue.files.maxFileCount", "10000"));
 
-        this.sessionId = sessionId;
-        this.fileName = fileName;
-		this.transport = validateTransport(transport);
+		this.sessionId = sessionId;
 		this.facilityName = validateFacilityName(facilityName);
 		this.email = validateEmail(transport, email);
 		String icatUrl = getIcatUrl(this.facilityName);
@@ -57,7 +66,27 @@ public class DownloadBuilder {
 		fullName = icatClient.getFullName();
 		priority = icatClient.getQueuePriority(userName);
 		icatClient.checkQueueAllowed(userName);
-    }
+	}
+
+	/**
+	 * Initialise with all settings, suitable for submitting Downloads.
+	 * 
+	 * @param sessionId    ICAT sessionId.
+	 * @param email        Optional email to notify upon completion.
+	 * @param fileName     Optional name to use as the root for each individual part
+	 *                     Download. Defaults to facilityName_visitId.
+	 * @param transport    Transport mechanism to use.
+	 * @param facilityName ICAT Facility.name.
+	 * @throws TopcatException if facilityName is invalid, or queueing not allowed
+	 *                         for this sessionId.
+	 */
+	public DownloadBuilder(String sessionId, String email, String fileName, String transport, String facilityName)
+			throws TopcatException {
+		this(sessionId, facilityName);
+		this.fileName = fileName;
+		this.transport = validateTransport(transport);
+		this.email = validateEmail(transport, email);
+	}
 
 	/**
 	 * Validate that the submitted transport mechanism is not null or empty.
@@ -196,7 +225,44 @@ public class DownloadBuilder {
 		}
 
 		buildDownloads(datasets, datafiles);
-    }
+	}
+
+	/**
+	 * Get the fileCount and fileSize of the specified visit.
+	 * 
+	 * @param visitId ICAT Investigation.visitId.
+	 * @return JsonObject in the format {"totalCount": 0, "totalSize": 0}
+	 * @throws TopcatException if querying ICAT fails.
+	 */
+	public JsonObject getVisitSize(String visitId) throws TopcatException {
+		if (visitId == null || visitId.equals("")) {
+			throw new BadRequestException("visitId must be provided");
+		}
+		JsonArray investigations = icatClient.getInvestigation(visitId);
+		if (investigations.size() == 0) {
+			throw new NotFoundException("No Investigations found for " + visitId);
+		}
+		long totalCount = 0;
+		long totalSize = 0;
+		for (JsonArray investigation : investigations.getValuesAs(JsonArray.class)) {
+			long investigationId = investigation.getJsonNumber(0).longValueExact();
+			long investigationFileCount = investigation.getJsonNumber(1).longValueExact();
+			long investigationFileSize = investigation.getJsonNumber(2).longValueExact();
+			// Database triggers should set these, but check explicitly anyway
+			if (investigationFileCount < 1L) {
+				investigationFileCount = icatClient.getInvestigationFileCount(investigationId);
+			}
+			if (investigationFileSize < 1L) {
+				investigationFileSize = icatClient.getInvestigationFileSize(investigationId);
+			}
+			totalCount += investigationFileCount;
+			totalSize += investigationFileSize;
+		}
+		JsonObjectBuilder builder = Json.createObjectBuilder();
+		builder.add("totalCount", totalCount);
+		builder.add("totalSize", totalSize);
+		return builder.build();
+	}
 
 	/**
 	 * Adds Datasets from an Investigation as DownloadItems.

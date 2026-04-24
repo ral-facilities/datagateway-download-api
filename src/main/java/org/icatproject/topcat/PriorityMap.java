@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jakarta.json.Json;
+import jakarta.json.JsonException;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonReader;
 
@@ -90,11 +91,14 @@ public class PriorityMap {
      * @param mapping        HashMap from String key to numeric priority level
      */
     private void parseObject(String propertyString, HashMap<String, Integer> mapping) {
-        JsonReader reader = Json.createReader(new ByteArrayInputStream(propertyString.getBytes()));
-        JsonObject object = reader.readObject();
-        for (String key : object.keySet()) {
-            int priority = object.getInt(key);
-            mapping.put(key, priority);
+        try (JsonReader reader = Json.createReader(new ByteArrayInputStream(propertyString.getBytes()))) {
+            JsonObject object = reader.readObject();
+            for (String key : object.keySet()) {
+                int priority = object.getInt(key);
+                mapping.put(key, priority);
+            }
+        } catch (JsonException e) {
+            logger.error("Could not parse {} as JSON object, defaulting to empty object", propertyString);
         }
     }
 

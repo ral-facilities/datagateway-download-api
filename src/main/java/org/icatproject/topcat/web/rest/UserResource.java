@@ -1038,8 +1038,50 @@ public class UserResource {
 	}
 
 	/**
-	 * Perform a search using the icat.lucene component for Datafile.locations, so that
-	 * these can then be used with the /queue/files endpoint.
+	 * Get the total size of a visit.
+	 * 
+	 * @param facilityName ICAT Facility.name.
+	 * @param sessionId    ICAT sessionId.
+	 * @param visitId      ICAT Investigation.visitId.
+	 * @return The "totalCount" and "totalSize" of all Datafiles in this visit.
+	 * @throws TopcatException              if querying ICAT fails.
+	 * @throws UnsupportedEncodingException if query encoding fails.
+	 */
+	@POST
+	@Path("/getSize/visit")
+	public Response getSizeVisit(@FormParam("facilityName") String facilityName,
+			@FormParam("sessionId") String sessionId, @FormParam("visitId") String visitId)
+			throws TopcatException, UnsupportedEncodingException {
+		logger.info("Get size of {}", visitId);
+		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, facilityName);
+		return Response.ok(downloadBuilder.getVisitSize(visitId)).build();
+	}
+
+	/**
+	 * Get the total size of a list of files.
+	 * 
+	 * @param facilityName ICAT Facility.name.
+	 * @param sessionId    ICAT sessionId.
+	 * @param files        ICAT Datafile.locations to download.
+	 * @return The "totalSize" and an array of any "notFound" locations which could
+	 *         not be found by the query.
+	 * @throws TopcatException              if querying ICAT fails.
+	 * @throws UnsupportedEncodingException if query encoding fails.
+	 */
+	@POST
+	@Path("/getSize/files")
+	public Response getSizeFiles(@FormParam("facilityName") String facilityName,
+			@FormParam("sessionId") String sessionId, @FormParam("files") List<String> files)
+			throws TopcatException, UnsupportedEncodingException {
+		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, facilityName);
+		logger.info("Get size of {} files", files.size());
+		DatafilesResponse response = downloadBuilder.extractLocations(files);
+		return Response.ok(response.buildSizeResponseBody()).build();
+	}
+
+	/**
+	 * Perform a search using the icat.lucene component for Datafile.locations, so
+	 * that these can then be used with the /queue/files endpoint.
 	 * 
 	 * Must be explicitly enabled by the run.properties.
 	 * 
@@ -1084,6 +1126,7 @@ public class UserResource {
 
 		JsonArrayBuilder fieldsBuilder = Json.createArrayBuilder();
 		fieldsBuilder.add("location");
+		fieldsBuilder.add("fileSize");
 		JsonObjectBuilder queryBuilder = Json.createObjectBuilder();
 		queryBuilder.add("text", query);
 		if (!icatClient.isAdmin()) {
