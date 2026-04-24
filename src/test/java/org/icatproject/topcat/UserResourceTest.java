@@ -429,6 +429,17 @@ public class UserResourceTest {
 	}
 
 	@Test
+	public void testGetSizeVisit() throws Exception {
+		System.out.println("DEBUG testGetSizeVisit");
+		String visitId = "Proposal 0 - 0 0";
+		Response response = userResource.getSizeVisit(null, sessionId, visitId);
+		assertEquals(200, response.getStatus());
+		JsonObject jsonObject = Utils.parseJsonObject(response.getEntity().toString());
+		assertEquals(300L, jsonObject.getJsonNumber("totalCount").longValueExact());
+		assertTrue(jsonObject.getJsonNumber("totalSize").longValueExact() > 0L); // Sizes are random
+	}
+
+	@Test
 	public void testQueueVisitIdBadRequest() throws Exception {
 		System.out.println("DEBUG testQueueVisitIdBadRequest");
 		String facilityName = "LILS";
@@ -498,14 +509,40 @@ public class UserResourceTest {
 	}
 
 	@Test
+	public void testGetSizeFiles() throws Exception {
+		System.out.println("DEBUG testGetSizeFiles");
+		String file = "abcdefghijklmnopqrstuvwxyz";
+		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+		List<JsonObject> datafiles = icatClient.getEntities("datafile", 2L);
+		List<String> files = new ArrayList<>();
+		files.add(file);
+		for (JsonObject datafile : datafiles) {
+			files.add(datafile.getString("location"));
+		}
+		Response response = userResource.getSizeFiles(null, sessionId, files);
+		assertEquals(200, response.getStatus());
+		JsonObject jsonObject = Utils.parseJsonObject(response.getEntity().toString());
+		assertEquals(2L, jsonObject.getJsonNumber("totalCount").longValueExact());
+		assertTrue(jsonObject.getJsonNumber("totalSize").longValueExact() > 0L); // Sizes are random
+		JsonArray missing = jsonObject.getJsonArray("notFound");
+		assertEquals(1, missing.size());
+		assertEquals(file, missing.getString(0));
+	}
+
+	@Test
 	public void testSearchFiles() throws Exception {
 		System.out.println("DEBUG testSearchFiles");
 		Response response = userResource.searchFiles(null, sessionId, 100, "visitId:\"Proposal 0 - 0 0\"", null);
 		assertEquals(200, response.getStatus());
 		JsonObject responseObject = Utils.parseJsonObject(response.getEntity().toString());
 		JsonArray results = responseObject.getJsonArray("results");
-		String firstSearchAfter = responseObject.getJsonObject("search_after").toString();
 		assertEquals(100, results.size());
+		// Assert all requested fields are in _source
+		JsonObject source = results.get(0).asJsonObject().getJsonObject("_source");
+		assertTrue(source.containsKey("location"));
+		assertTrue(source.containsKey("fileSize"));
+
+		String firstSearchAfter = responseObject.getJsonObject("search_after").toString();
 		JsonObject firstSearchAfterObject = Utils.parseJsonObject(firstSearchAfter);
 		JsonArray firstFields = firstSearchAfterObject.getJsonArray("fields");
 		int firstDoc = firstSearchAfterObject.getJsonNumber("doc").intValueExact();
@@ -519,8 +556,9 @@ public class UserResourceTest {
 		assertEquals(200, response.getStatus());
 		responseObject = Utils.parseJsonObject(response.getEntity().toString());
 		results = responseObject.getJsonArray("results");
-		String secondSearchAfter = responseObject.getJsonObject("search_after").toString();
 		assertEquals(3, results.size());
+		assertTrue(responseObject.containsKey("search_after"));
+		String secondSearchAfter = responseObject.getJsonObject("search_after").toString();
 		JsonObject secondSearchAfterObject = Utils.parseJsonObject(secondSearchAfter);
 		JsonArray secondFields = secondSearchAfterObject.getJsonArray("fields");
 		assertEquals(0, secondSearchAfterObject.getJsonNumber("shardIndex").intValueExact());
