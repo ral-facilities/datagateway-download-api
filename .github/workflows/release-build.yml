@@ -57,7 +57,7 @@ jobs:
         if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Update SNAPSHOT tag
-        uses: richardsimko/update-tag@v1
+        uses: richardsimko/update-tag@v2
         with:
           tag_name: ${{ env.TAG_NAME }}
         env:
