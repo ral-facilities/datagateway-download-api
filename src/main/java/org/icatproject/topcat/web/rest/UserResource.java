@@ -567,6 +567,7 @@ public class UserResource {
 				em.persist(parentEntity);
 
 				parentEntity = new ParentEntity();
+				parentEntity.setCartItem(cartItem);
 				parentEntity.setEntityType(EntityType.valueOf("investigation"));
 				parentEntity.setEntityId(Long.valueOf(entity.getJsonObject("dataset").getJsonObject("investigation").getJsonNumber("id").longValue()));
 				cartItem.getParentEntities().add(parentEntity);
@@ -574,6 +575,7 @@ public class UserResource {
 
 			} else if (entityType.equals("dataset")) {
 				ParentEntity parentEntity = new ParentEntity();
+				parentEntity.setCartItem(cartItem);
 				parentEntity.setEntityType(EntityType.valueOf("investigation"));
 				parentEntity.setEntityId(Long.valueOf(entity.getJsonObject("investigation").getJsonNumber("id").longValue()));
 				cartItem.getParentEntities().add(parentEntity);
