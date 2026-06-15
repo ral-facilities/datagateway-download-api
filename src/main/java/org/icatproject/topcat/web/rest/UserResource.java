@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 
 import org.icatproject.topcat.IdsClient;
 import org.icatproject.topcat.PriorityMap;
+import org.icatproject.topcat.CartBuilder;
 import org.icatproject.topcat.DownloadBuilder;
 import org.icatproject.topcat.FacilityMap;
 import org.icatproject.topcat.IcatClient;
@@ -477,121 +478,18 @@ public class UserResource {
 			cart.setFacilityName(facilityName);
 			cart.setUserName(cartUserName);
 			em.persist(cart);
-			em.flush();
 		}
-
-		Map<Long, Boolean> isInvestigationIdIndex = new HashMap<Long, Boolean>();
-        Map<Long, Boolean> isDatasetIdIndex = new HashMap<Long, Boolean>();
-        Map<Long, Boolean> isDatafileIdIndex = new HashMap<Long, Boolean>();
-
-        for(CartItem cartItem : cart.getCartItems()){
-            if(cartItem.getEntityType().equals(EntityType.valueOf("investigation"))){
-                isInvestigationIdIndex.put(cartItem.getEntityId(), true);
-            } else if(cartItem.getEntityType().equals(EntityType.valueOf("dataset"))){
-                isDatasetIdIndex.put(cartItem.getEntityId(), true);
-            } else {
-            	isDatafileIdIndex.put(cartItem.getEntityId(), true);
-            }
-        }
-
-		List<Long> investigationIdsToAdd = new ArrayList<Long>();
-		List<Long> datasetIdsToAdd = new ArrayList<Long>();
-		List<Long> datafileIdsToAdd = new ArrayList<Long>();
-
-
-		for (String item : items.split("\\s*,\\s*")) {
-			String[] pair = item.split("\\s+");
-			if (pair.length == 2) {
-				String entityType = pair[0];
-				Long entityId = Long.parseLong(pair[1]);
-				if(entityType.equals("investigation") && isInvestigationIdIndex.get(entityId) != null){
-					continue;
-				} else if(entityType.equals("dataset") && isDatasetIdIndex.get(entityId) != null){
-					continue;
-				} else if(entityType.equals("datafile") && isDatafileIdIndex.get(entityId) != null){
-					continue;
-				}
-
-				if(entityType.equals("investigation")){
-					investigationIdsToAdd.add(entityId);
-					isInvestigationIdIndex.put(entityId, true);
-				} else if(entityType.equals("dataset")){
-					datasetIdsToAdd.add(entityId);
-					isDatasetIdIndex.put(entityId, true);
-				} else {
-					datafileIdsToAdd.add(entityId);
-				}
-			}
-		}
-
-		addEntitiesToCart(icatClient, cart, "investigation", investigationIdsToAdd);
-		addEntitiesToCart(icatClient, cart, "dataset", datasetIdsToAdd);
-		addEntitiesToCart(icatClient, cart, "datafile", datafileIdsToAdd);
-
+		logger.info("Starting Cart state: {} items, {} total fileCount, {} total fileSize",
+				cart.getCartItems().size(), cart.getFileCount(), cart.getFileSize());
+		CartBuilder cartBuilder = new CartBuilder(cart, icatClient);
+		cartBuilder.addEntities(items);
 		em.flush();
-		em.refresh(cart);
-
-		//remove any entities that have a parent added to the cart
-
-        for(CartItem cartItem : cart.getCartItems()){
-            for(ParentEntity parentEntity : cartItem.getParentEntities()){
-                if(parentEntity.getEntityType().equals(EntityType.valueOf("investigation")) && isInvestigationIdIndex.get(parentEntity.getEntityId()) != null){
-                    em.remove(cartItem);
-                    break;
-                } else if(parentEntity.getEntityType().equals(EntityType.valueOf("dataset")) && isDatasetIdIndex.get(parentEntity.getEntityId()) != null){
-                    em.remove(cartItem);
-                    break;
-                }
-            }
-        }
-
-		em.flush();
-		em.refresh(cart);
+		logger.info("Final Cart state: {} items, {} total fileCount, {} total fileSize",
+				cart.getCartItems().size(), cart.getFileCount(), cart.getFileSize());
 
 		return Response.ok().entity(cart).build();
 	}
 
-
-	private void addEntitiesToCart(IcatClient icatClient, Cart cart, String entityType, List<Long> entityIds) throws TopcatException {
-		if(entityIds.size() == 0){
-			return;
-		}	
-
-		for (JsonObject entity : icatClient.getEntities(entityType, entityIds)) {
-			String name = entity.getString("name");
-			Long entityId = Long.valueOf(entity.getJsonNumber("id").longValue());
-
-			CartItem cartItem = new CartItem();
-			cartItem.setCart(cart);
-			cartItem.setEntityType(EntityType.valueOf(entityType));
-			cartItem.setEntityId(entityId);
-			cartItem.setName(name);
-			em.persist(cartItem);
-
-
-			if (entityType.equals("datafile")) {
-				ParentEntity parentEntity = new ParentEntity();
-				parentEntity.setCartItem(cartItem);
-				parentEntity.setEntityType(EntityType.valueOf("dataset"));
-				parentEntity.setEntityId(Long.valueOf(entity.getJsonObject("dataset").getJsonNumber("id").longValue()));
-				cartItem.getParentEntities().add(parentEntity);
-				em.persist(parentEntity);
-
-				parentEntity = new ParentEntity();
-				parentEntity.setEntityType(EntityType.valueOf("investigation"));
-				parentEntity.setEntityId(Long.valueOf(entity.getJsonObject("dataset").getJsonObject("investigation").getJsonNumber("id").longValue()));
-				cartItem.getParentEntities().add(parentEntity);
-				em.persist(parentEntity);
-
-			} else if (entityType.equals("dataset")) {
-				ParentEntity parentEntity = new ParentEntity();
-				parentEntity.setEntityType(EntityType.valueOf("investigation"));
-				parentEntity.setEntityId(Long.valueOf(entity.getJsonObject("investigation").getJsonNumber("id").longValue()));
-				cartItem.getParentEntities().add(parentEntity);
-				em.persist(parentEntity);
-			}
-		}
-	}
 
 	/**
 	 * Deletes items from the cart associated with a particular sessionId and
@@ -663,6 +561,7 @@ public class UserResource {
 						boolean entityTypesMatch = cartItem.getEntityType().equals(EntityType.valueOf(entityType));
 						boolean entityIdsMatch = cartItem.getEntityId().equals(entityId);
 						if (entityTypesMatch && entityIdsMatch) {
+							cart.decrementFileCountSize(cartItem);
 							em.remove(cartItem);
 						}
 					}
@@ -670,6 +569,7 @@ public class UserResource {
 					Long id = Long.parseLong(pair[0]);
 					for (CartItem cartItem : cart.getCartItems()) {
 						if (cartItem.getId().equals(id)) {
+							cart.decrementFileCountSize(cartItem);
 							em.remove(cartItem);
 							break;
 						}
@@ -774,29 +674,18 @@ public class UserResource {
 			Long countLimit = facilityMap.getCountLimit(facilityName);
 			Long sizeLimit = facilityMap.getSizeLimit(facilityName);
 			if (countLimit != null || sizeLimit != null) {
-				List<Long> investigationIds = new ArrayList<>();
-				List<Long> datasetIds = new ArrayList<>();
-				List<Long> datafileIds = new ArrayList<>();
-				for (CartItem cartItem : cart.getCartItems()) {
-					switch (cartItem.getEntityType()) {
-						case investigation:
-							investigationIds.add(cartItem.getEntityId());
-							continue;
-						case dataset:
-							datasetIds.add(cartItem.getEntityId());
-							continue;
-						case datafile:
-							datafileIds.add(cartItem.getEntityId());
-							continue;
-						default:
-							throw new InternalException("Unrecognised entityType: " + cartItem.getEntityType());
-					}
+				long fileCount = cart.getFileCount();
+				long fileSize = cart.getFileSize();
+				if (fileCount == 0L && fileSize == 0L) {
+					new CartBuilder(cart, icatClient);  // Calculates fileCount and fileSize in place on `cart`
+					fileCount = cart.getFileCount();
+					fileSize = cart.getFileSize();
+					em.flush();  // Persist the newly calculated fileCount and fileSize
 				}
-				IcatClient.EntityCounter entityCounter = icatClient.new EntityCounter(investigationIds, datasetIds, datafileIds);
-				if (countLimit != null && entityCounter.totalCount > countLimit) {
+				if (countLimit != null && fileCount > countLimit) {
 					throw new BadRequestException("Unable to submit for cart for download, number of files exceeds limit");
 				}
-				if (sizeLimit != null && entityCounter.totalSize > sizeLimit) {
+				if (sizeLimit != null && fileSize > sizeLimit) {
 					throw new BadRequestException("Unable to submit for cart for download, size of files exceeds limit");
 				}
 			}
