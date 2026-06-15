@@ -262,7 +262,7 @@ public class UserResourceTest {
 			investigationCartItem = cart.getCartItems().get(0);
 			assertEquals(EntityType.investigation, investigationCartItem.getEntityType());
 			assertEquals(expectedFileCount, investigationCartItem.getFileCount());
-			assertEquals(expectedFileSize, investigationCartItem.getFileCount());
+			assertEquals(expectedFileSize, investigationCartItem.getFileSize());
 
 			// Remove the parents to get an empty cart
 			response = userResource.addCartItems(facilityName, sessionId, parentItemsString, true);
