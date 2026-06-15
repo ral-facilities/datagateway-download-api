@@ -479,12 +479,12 @@ public class UserResource {
 			cart.setUserName(cartUserName);
 			em.persist(cart);
 		}
-		logger.info("Starting Cart state: {} items, {} total fileCount, {} total fileSize",
+		logger.info("Starting cart state: {} items, {} total fileCount, {} total fileSize",
 				cart.getCartItems().size(), cart.getFileCount(), cart.getFileSize());
 		CartBuilder cartBuilder = new CartBuilder(cart, icatClient);
 		cartBuilder.addEntities(items);
 		em.flush();
-		logger.info("Final Cart state: {} items, {} total fileCount, {} total fileSize",
+		logger.info("Final cart state: {} items, {} total fileCount, {} total fileSize",
 				cart.getCartItems().size(), cart.getFileCount(), cart.getFileSize());
 
 		return Response.ok().entity(cart).build();
@@ -546,11 +546,14 @@ public class UserResource {
 		}
 
 		if (items.equals("*")) {
-			for (CartItem cartItem : cart.getCartItems()) {
-				em.remove(cartItem);
-			}
+			logger.info("Removing all items from the cart");
+			em.remove(cart);
+			em.flush();
+			return emptyCart(facilityName, cartUserName);
 		} else {
-			for (String item : items.split("\\s*,\\s*")) {
+			String[] itemsArray = items.split("\\s*,\\s*");
+			logger.info("Removing {} items from the cart", itemsArray.length);
+			for (String item : itemsArray) {
 				String[] pair = item.split("\\s+");
 
 				if (pair.length > 1) {
@@ -561,16 +564,15 @@ public class UserResource {
 						boolean entityTypesMatch = cartItem.getEntityType().equals(EntityType.valueOf(entityType));
 						boolean entityIdsMatch = cartItem.getEntityId().equals(entityId);
 						if (entityTypesMatch && entityIdsMatch) {
-							cart.decrementFileCountSize(cartItem);
-							em.remove(cartItem);
+							cart.removeCartItem(cartItem);
+							break;
 						}
 					}
 				} else {
 					Long id = Long.parseLong(pair[0]);
 					for (CartItem cartItem : cart.getCartItems()) {
 						if (cartItem.getId().equals(id)) {
-							cart.decrementFileCountSize(cartItem);
-							em.remove(cartItem);
+							cart.removeCartItem(cartItem);
 							break;
 						}
 					}
@@ -578,16 +580,19 @@ public class UserResource {
 			}
 		}
 
-		em.flush();
-		em.refresh(cart);
-
 		if (cart.getCartItems().size() == 0) {
+			logger.info("All items removed, returning empty cart",
+					cart.getCartItems().size(), cart.getFileCount(), cart.getFileSize());
 			em.remove(cart);
 			em.flush();
 			return emptyCart(facilityName, cartUserName);
+		} else {
+			em.flush();
+			logger.info("Final cart state: {} items, {} total fileCount, {} total fileSize",
+					cart.getCartItems().size(), cart.getFileCount(), cart.getFileSize());
+			return Response.ok().entity(cart).build();
 		}
 
-		return Response.ok().entity(cart).build();
 	}
 
 	/**

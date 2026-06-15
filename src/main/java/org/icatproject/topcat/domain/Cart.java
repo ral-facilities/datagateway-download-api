@@ -208,6 +208,16 @@ public class Cart implements Serializable {
     }
 
     /**
+     * Removes a CartItem and decrement fileCount/fileSize.
+     * 
+     * @param cartItem CartItem to be removed from the cart
+     */
+    public void removeCartItem(CartItem cartItem) {
+        cartItems.remove(cartItem);
+        decrementFileCountSize(cartItem);
+    }
+
+    /**
      * Removes a Collection of CartItems without changing fileCount/fileSize.
      * 
      * @param cartItems Collection of CartItems to be removed from the cart
