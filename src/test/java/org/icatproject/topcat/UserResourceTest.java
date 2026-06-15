@@ -249,7 +249,7 @@ public class UserResourceTest {
 			CartItem investigationCartItem = cart.getCartItems().get(0);
 			assertEquals(EntityType.investigation, investigationCartItem.getEntityType());
 			assertEquals(expectedFileCount, investigationCartItem.getFileCount());
-			assertEquals(expectedFileSize, investigationCartItem.getFileCount());
+			assertEquals(expectedFileSize, investigationCartItem.getFileSize());
 
 			// Try adding the original child again - should have no effect
 			response = userResource.addCartItems(facilityName, sessionId, items, false);
