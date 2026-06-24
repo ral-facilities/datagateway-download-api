@@ -30,42 +30,25 @@ if not verifySsl:
 	
 datagateway_url = input("DataGateway url: ")
 
+def extract_plugin_settings(plugin: "dict[str, str]") -> str:
+	url = re.sub(r"/main.*\.js", "", plugin["src"])
+	if url[0] == "/":
+		url = datagateway_url + url
+
+	return json.loads(
+		requests.get(f"{url}/{plugin['name']}-settings.json", verify=verifySsl).text
+	)
+
 scigatewaySettingsJson = json.loads(requests.get(datagateway_url + "/settings.json", verify=verifySsl).text)
-datagateway_download_url = re.sub(r"/main.*\.js", "", next(x for x in scigatewaySettingsJson["plugins"] if x["name"] == "datagateway-download")["src"])
+for plugin in scigatewaySettingsJson["plugins"]:
+	if plugin["name"] == "datagateway-download":
+		download_plugin_settings = extract_plugin_settings(plugin=plugin)
+	elif plugin["name"] == "datagateway-search":
+		search_plugin_settings = extract_plugin_settings(plugin=plugin)
 
-# add datagateway_url back in if it's a relative URL
-if datagateway_download_url[0] == "/":
-	datagateway_download_url = datagateway_url + datagateway_download_url
-	
-settingsJson = json.loads(requests.get(datagateway_download_url + "/datagateway-download-settings.json", verify=verifySsl).text)
-
-facility_name = settingsJson["facilityName"]
-
-ids_urls = [settingsJson["accessMethods"][x]["idsUrl"] for x in list(settingsJson["accessMethods"])]
-
-if len(ids_urls) > 1:
-	print("Available IDS servers: ")
-	for i, ids in enumerate(ids_urls):
-		print(str(i+1) + ": " + ids)
-	try:
-		option_number = int(input("Choose a number to select that IDS server: "))
-	except ValueError:
-		# this will trigger the Invalid Input response below
-		option_number = -1
-	option_number = option_number - 1
-	if option_number not in range(len(ids_urls)):
-		print("Invalid input,  selecting default IDS")
-		ids_url = settingsJson["idsUrl"]
-	else:
-		ids_url = ids_urls[option_number]
-else:
-	ids_url = settingsJson["idsUrl"]
-
-print("IDS url: " + ids_url)
-
-topcat_url = settingsJson["downloadApiUrl"]
-
-icat_url = requests.get(ids_url + "/getIcatUrl", verify=verifySsl).text + "/icat"
+facility_name = download_plugin_settings["facilityName"]
+topcat_url = download_plugin_settings["downloadApiUrl"]
+icat_url = search_plugin_settings["icatUrl"]
 
 print("ICAT url: " + icat_url)
 
@@ -103,6 +86,32 @@ except Exception as e:
     import sys
     sys.exit("Couldn't determine sessionId: " + str(e) + "; response: " + response.text)
 
+response = requests.get(
+	url=topcat_url + "/user/downloadType/status",
+	params={"facilityName": facility_name, "sessionId": session_id},
+	verify=verifySsl,
+)
+ids_urls = [d["idsUrl"] for d in json.loads(response.text).values()]
+
+if len(ids_urls) > 1:
+	print("Available IDS servers: ")
+	for i, ids in enumerate(ids_urls):
+		print(str(i+1) + ": " + ids)
+	try:
+		option_number = int(input("Choose a number to select that IDS server: "))
+	except ValueError:
+		# this will trigger the Invalid Input response below
+		option_number = -1
+	option_number = option_number - 1
+	if option_number not in range(len(ids_urls)):
+		print("Invalid input,  selecting default IDS")
+		ids_url = download_plugin_settings["idsUrl"]
+	else:
+		ids_url = ids_urls[option_number]
+else:
+	ids_url = download_plugin_settings["idsUrl"]
+
+print("IDS url: " + ids_url)
 
 def input_download_ids():
 	download_ids = input("Enter one or more space separated download id(s): ")
