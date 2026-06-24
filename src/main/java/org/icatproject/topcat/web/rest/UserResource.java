@@ -471,13 +471,8 @@ public class UserResource {
 		String userName = icatClient.getUserName();
 		String cartUserName = getCartUserName(userName, sessionId);
 		Cart cart = cartRepository.getCart(cartUserName, facilityName);
-
 		if (cart == null) {
-			cart = new Cart();
-			cart.setFacilityName(facilityName);
-			cart.setUserName(cartUserName);
-			em.persist(cart);
-			em.flush();
+			cart = cartRepository.createCart(cartUserName, facilityName);
 		}
 
 		Map<Long, Boolean> isInvestigationIdIndex = new HashMap<Long, Boolean>();

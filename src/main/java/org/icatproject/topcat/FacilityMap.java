@@ -14,6 +14,8 @@ public class FacilityMap {
         public String idsUrl;
 		public Long countLimit = null;
 		public Long sizeLimit = null;
+		public Integer maxCartAgeDaysAnon = null;
+		public Integer maxCartAgeDaysAuthenticated = null;
     }
 	
     private static FacilityMap instance = null;
@@ -88,6 +90,16 @@ public class FacilityMap {
 				facility.sizeLimit = Long.valueOf(sizeString);
 			}
 
+			String maxCartAgeDaysRoot = "facility." + facilityName + ".maxCartAgeDays.";
+			String maxCartAgeDaysAnonString = properties.getProperty(maxCartAgeDaysRoot + "anon");
+			if (maxCartAgeDaysAnonString != null) {
+				facility.maxCartAgeDaysAnon = Integer.valueOf(maxCartAgeDaysAnonString);
+			}
+			String maxCartAgeDaysAuthenticatedString = properties.getProperty(maxCartAgeDaysRoot + "authenticated");
+			if (maxCartAgeDaysAuthenticatedString != null) {
+				facility.maxCartAgeDaysAuthenticated = Integer.valueOf(maxCartAgeDaysAuthenticatedString);
+			}
+
 			facilityMapping.put(facilityName, facility);
 		}
 	}
@@ -154,6 +166,26 @@ public class FacilityMap {
 	public Long getSizeLimit(String facilityName) throws InternalException {
 		Facility facility = getFacility(facilityName);
 		return facility.sizeLimit;
+	}
+
+	/**
+	 * @param facilityName ICAT Facility.name
+	 * @return Limit on the maximum age of an anonymous user's cart in days, or null if not set
+	 * @throws InternalException if facilityName is not a key in facilityMapping
+	 */
+	public Integer getMaxCartAgeDaysAnon(String facilityName) throws InternalException {
+		Facility facility = getFacility(facilityName);
+		return facility.maxCartAgeDaysAnon;
+	}
+
+	/**
+	 * @param facilityName ICAT Facility.name
+	 * @return Limit on the maximum age of an authenticated user's cart in days, or null if not set
+	 * @throws InternalException if facilityName is not a key in facilityMapping
+	 */
+	public Integer getMaxCartAgeDaysAuthenticated(String facilityName) throws InternalException {
+		Facility facility = getFacility(facilityName);
+		return facility.maxCartAgeDaysAuthenticated;
 	}
 
 	/**
