@@ -24,7 +24,11 @@ public class FacilityMap {
        }
        return instance;
     }
-    
+
+	synchronized static void setInstance(FacilityMap facilityMap) {
+		instance = facilityMap;
+	}
+
 	private Logger logger = LoggerFactory.getLogger(FacilityMap.class);
 	
 	private Properties properties;
