@@ -49,7 +49,7 @@ jobs:
           fi
 
       - name: Check that version ends with -SNAPSHOT (if on master)
-        uses: nick-invision/assert-action@v2
+        uses: nick-invision/assert-action@v4
         with:
           expected: '-SNAPSHOT'
           actual: ${{ env.TAG_NAME }}
