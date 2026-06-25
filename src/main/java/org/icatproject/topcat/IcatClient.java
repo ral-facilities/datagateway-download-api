@@ -410,12 +410,12 @@ public class IcatClient {
 	}
 
 	/**
-	 * Utility method to get the fileSize (not size) of an Investigation by
+	 * Utility method to get the fileSize (not count) of an Investigation by
 	 * SELECTing its child Datafiles. Ideally the fileSize field should be used,
 	 * this is a fallback option if that field is not set.
 	 * 
 	 * @param investigationId ICAT Investigation.id
-	 * @return The total size of Datafiles in the specified Investigation
+	 * @return The total size (in bytes) of Datafiles in the specified Investigation
 	 * @throws TopcatException
 	 */
 	public long getInvestigationFileSize(long investigationId) throws TopcatException {
@@ -445,12 +445,12 @@ public class IcatClient {
 	}
 
 	/**
-	 * Utility method to get the fileSize (not size) of a Dataset by SELECTing its
+	 * Utility method to get the fileSize (not count) of a Dataset by SELECTing its
 	 * child Datafiles. Ideally the fileSize field should be used, this is a
 	 * fallback option if that field is not set.
 	 * 
 	 * @param datasetId ICAT Dataset.id
-	 * @return The total size of Datafiles in the specified Dataset
+	 * @return The total size (in bytes) of Datafiles in the specified Dataset
 	 * @throws TopcatException
 	 */
 	public long getDatasetFileSize(long datasetId) throws TopcatException {

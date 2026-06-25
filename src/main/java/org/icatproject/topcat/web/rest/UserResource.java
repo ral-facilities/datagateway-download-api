@@ -1043,7 +1043,8 @@ public class UserResource {
 	 * @param facilityName ICAT Facility.name.
 	 * @param sessionId    ICAT sessionId.
 	 * @param visitId      ICAT Investigation.visitId.
-	 * @return The "totalCount" and "totalSize" of all Datafiles in this visit.
+	 * @return The "totalCount" and "totalSize" (in bytes) of all Datafiles in this
+	 *         visit.
 	 * @throws TopcatException              if querying ICAT fails.
 	 * @throws UnsupportedEncodingException if query encoding fails.
 	 */
@@ -1063,8 +1064,8 @@ public class UserResource {
 	 * @param facilityName ICAT Facility.name.
 	 * @param sessionId    ICAT sessionId.
 	 * @param files        ICAT Datafile.locations to download.
-	 * @return The "totalSize" and an array of any "notFound" locations which could
-	 *         not be found by the query.
+	 * @return The "totalSize" (in bytes) and an array of any "notFound" locations which
+	 *         could not be found by the query.
 	 * @throws TopcatException              if querying ICAT fails.
 	 * @throws UnsupportedEncodingException if query encoding fails.
 	 */
