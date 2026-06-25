@@ -7,11 +7,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 
 import org.icatproject.topcat.httpclient.*;
+import org.icatproject.topcat.icatEntities.Datafile;
+import org.icatproject.topcat.icatEntities.Dataset;
+import org.icatproject.topcat.icatEntities.Investigation;
 import org.icatproject.topcat.exceptions.*;
 import org.apache.commons.lang3.StringUtils;
 import org.icatproject.topcat.domain.*;
@@ -50,7 +54,11 @@ public class IcatClient {
 
 	/**
 	 * Utility class for calculating the count and size of a cart.
+	 * 
+	 * No longer used as count/size are calculated by CartBuilder as items are added.
+	 * Could be useful in the future, otherwise if we're happy we don't need this then delete it.
 	 */
+	@Deprecated
 	public class EntityCounter {
 		private int getUrlLimit = Integer.parseInt(Properties.getInstance().getProperty("getUrlLimit", "1024"));
 		public long totalSize = 0L;
@@ -139,6 +147,12 @@ public class IcatClient {
 	private static final int minimumQuerySize = "entityManager?sessionId=&query=".length() + 36;  // sessionIds are 36 characters
 	private static final int commaSize;
 	private static final int parenthesisSize;
+	private static final String investigationPrefix = "SELECT investigation from Investigation investigation where investigation.id in (";
+	private static final String investigationSuffix = ")";
+	private static final String datasetPrefix = "SELECT dataset from Dataset dataset where dataset.id in (";
+	private static final String datasetSuffix = ") include dataset.investigation";
+	private static final String datafilePrefix = "SELECT datafile from Datafile datafile where datafile.id in (";
+	private static final String datafileSuffix = ") include datafile.dataset.investigation";
 
 	static {
 		int parenthesisSizeNonFinal = 3;
@@ -297,7 +311,8 @@ public class IcatClient {
 	 * @throws TopcatException
 	 * @throws UnsupportedEncodingException 
 	 */
-	public DatafilesResponse getDatafiles(List<String> files) throws TopcatException, UnsupportedEncodingException {
+	public DatafilesResponse getDatafilesFromLocation(List<String> files)
+			throws TopcatException, UnsupportedEncodingException {
 		DatafilesResponse response = new DatafilesResponse();
 		if (files.size() == 0) {
 			// Ensure that we don't error when calling .next() below by returning early
@@ -482,36 +497,76 @@ public class IcatClient {
 		}
 	}
 
+	/**
+	 * @param entityIds Set of ICAT Investigation ids
+	 * @return List of Investigations
+	 * @throws TopcatException if ICAT query fails
+	 */
+	public List<Investigation> getInvestigations(Set<Long> entityIds) throws TopcatException {
+		List<Investigation> investigations = new ArrayList<>();
+		getEntities(investigationPrefix, investigationSuffix, entityIds).forEach(e -> investigations.add(new Investigation(e)));
+		return investigations;
+	}
+
+	/**
+	 * @param entityIds Set of ICAT Dataset ids
+	 * @return List of Datasets
+	 * @throws TopcatException if ICAT query fails
+	 */
+	public List<Dataset> getDatasets(Set<Long> entityIds) throws TopcatException {
+		List<Dataset> datasets = new ArrayList<>();
+		getEntities(datasetPrefix, datasetSuffix, entityIds).forEach(e -> datasets.add(new Dataset(e)));
+		return datasets;
+	}
+
+	/**
+	 * @param entityIds Set of ICAT Datafile ids
+	 * @return List of Datafiles
+	 * @throws TopcatException if ICAT query fails
+	 */
+	public List<Datafile> getDatafiles(Set<Long> entityIds) throws TopcatException {
+		List<Datafile> datafiles = new ArrayList<>();
+		getEntities(datafilePrefix, datafileSuffix, entityIds).forEach(e -> datafiles.add(new Datafile(e)));
+		return datafiles;
+	}
+
+	@Deprecated  // Only used in tests
 	public List<JsonObject> getEntities(String entityType, List<Long> entityIds) throws TopcatException {
+		if (entityType.equals("datafile")) {
+			return getEntities(datafilePrefix, datafileSuffix, entityIds);
+		} else if (entityType.equals("dataset")) {
+			return getEntities(datasetPrefix, datasetSuffix, entityIds);
+		} else {
+			return getEntities(investigationPrefix, investigationSuffix, entityIds);
+		}
+	}
+
+	/**
+	 * Performs ICAT queries for a Collection of ids. Handles large requests by
+	 * chunking the collection and executing serially.
+	 * 
+	 * @param queryPrefix Prefix of the form "SELECT ... WHERE o.id in ("
+	 * @param querySuffix Suffix of the form ") ..."
+	 * @param entityIds   Collection of ICAT entity ids to be formatted between the
+	 * 	                  prefix and suffix
+	 * @return List of JsonObjects returned by the query
+	 * @throws TopcatException if the ICAT query fails
+	 */
+	public List<JsonObject> getEntities(String queryPrefix, String querySuffix, Collection<Long> entityIds) throws TopcatException {
 		List<JsonObject> out = new ArrayList<JsonObject>();
 		try {
-			entityIds = new ArrayList<Long>(entityIds);
-
-			String queryPrefix;
-			String querySuffix;
-
-			if (entityType.equals("datafile")) {
-				queryPrefix = "SELECT datafile from Datafile datafile where datafile.id in (";
-				querySuffix = ") include datafile.dataset.investigation";
-			} else if (entityType.equals("dataset")) {
-				queryPrefix = "SELECT dataset from Dataset dataset where dataset.id in (";
-				querySuffix = ") include dataset.investigation";
-			} else {
-				queryPrefix = "SELECT investigation from Investigation investigation where investigation.id in (";
-				querySuffix = ")";
-			}
-
+			List<Long> entityIdsMutating = new ArrayList<>(entityIds);
 			StringBuffer currentCandidateEntityIds = new StringBuffer();
 			String currentPassedUrl = null;
 			String currentCandidateUrl = null;
 
 			List<String> passedUrls = new ArrayList<String>();
 
-			while(entityIds.size() > 0){
+			while(entityIdsMutating.size() > 0){
 				if (currentCandidateEntityIds.length() != 0) {
 					currentCandidateEntityIds.append(",");
 				}
-				currentCandidateEntityIds.append(entityIds.get(0));
+				currentCandidateEntityIds.append(entityIdsMutating.get(0));
 				currentCandidateUrl = "entityManager?sessionId="  + URLEncoder.encode(sessionId, "UTF8") + "&query=" + URLEncoder.encode(queryPrefix + currentCandidateEntityIds.toString() + querySuffix , "UTF8");
 				if(httpClient.urlLength(currentCandidateUrl) > 2048){
 					currentCandidateEntityIds = new StringBuffer();
@@ -523,7 +578,7 @@ public class IcatClient {
 				} else {
 					currentPassedUrl = currentCandidateUrl;
 					currentCandidateUrl = null;
-					entityIds.remove(0);
+					entityIdsMutating.remove(0);
 				}
 			}
 
@@ -542,7 +597,8 @@ public class IcatClient {
 
 				for(JsonValue entityValue : Utils.parseJsonArray(response.toString())){
 					JsonObject entity = (JsonObject) entityValue;
-					out.add(entity.getJsonObject(entityType.substring(0, 1).toUpperCase() + entityType.substring(1)));
+					// In practice, has one entry mapping from the EntityType to the object of interest
+					entity.values().forEach(v -> out.add(v.asJsonObject()));
 				}
 			}
 		} catch (TopcatException e){

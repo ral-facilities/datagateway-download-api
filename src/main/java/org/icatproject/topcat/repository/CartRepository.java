@@ -27,6 +27,14 @@ public class CartRepository {
     @PersistenceContext(unitName="topcat")
     EntityManager em;
 
+    /**
+     * @param cart Cart to be persisted and flushed
+     */
+    public void createCart(Cart cart) {
+        em.persist(cart);
+        em.flush();
+    }
+
     public Cart getCart(String userName, String facilityName){
         TypedQuery<Cart> query = em.createQuery("select cart from Cart cart where cart.userName = :userName and cart.facilityName = :facilityName", Cart.class)
             .setParameter("userName", userName)
@@ -38,4 +46,17 @@ public class CartRepository {
         }
     }
 
+    /**
+     * If a Cart exists with the specified parameters, remove it.
+     * 
+     * @param facilityName ICAT Facility.name to which the cart belongs
+     * @param userName     ICAT User.name to whom the cart belongs
+     */
+    public void removeCart(String facilityName, String userName) {
+        Cart  cart = getCart(userName, facilityName);
+        if (cart != null) {
+            em.remove(cart);
+            em.flush();
+        }
+    }
 }

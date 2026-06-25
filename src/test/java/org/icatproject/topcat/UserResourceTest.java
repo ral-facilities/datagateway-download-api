@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import jakarta.ejb.EJB;
@@ -40,10 +41,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
 import org.icatproject.topcat.httpclient.HttpClient;
+import org.icatproject.topcat.icatEntities.Datafile;
+import org.icatproject.topcat.icatEntities.Investigation;
 import org.icatproject.topcat.domain.Cart;
+import org.icatproject.topcat.domain.CartItem;
 import org.icatproject.topcat.domain.Download;
 import org.icatproject.topcat.domain.DownloadStatus;
 import org.icatproject.topcat.domain.DownloadType;
+import org.icatproject.topcat.domain.EntityType;
+import org.icatproject.topcat.domain.ParentEntity;
 import org.icatproject.topcat.exceptions.BadRequestException;
 import org.icatproject.topcat.exceptions.ForbiddenException;
 import org.icatproject.topcat.exceptions.NotFoundException;
@@ -89,6 +95,8 @@ public class UserResourceTest {
 
 	private static String sessionId;
 	private static String nonAdminSessionId;
+	private static final String facilityName = "LILS";
+	private static final String adminUserName = "simple/root";
 
 	@BeforeAll
 	public static void beforeAll() {
@@ -190,6 +198,170 @@ public class UserResourceTest {
 		response = userResource.deleteCartItems(facilityName, sessionId, "dataset " + entityId);
 		assertEquals(200, response.getStatus());
 		assertEquals(0, getCartSize(response));
+	}
+
+	@Test
+	public void testNewCartAddCartItems() throws MalformedURLException, TopcatException, ParseException {
+		try {
+			cartRepository.removeCart(facilityName, adminUserName);  // Ensure there's no existing cart
+
+			// Add an item
+			IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+			JsonObject datafile = icatClient.getEntity("datafile");
+			long expectedFileCount = 1L;
+			long expectedFileSize = datafile.getJsonNumber("fileSize").longValueExact();
+			String items = "datafile " + datafile.getJsonNumber("id").longValueExact();
+			Response response = userResource.addCartItems(facilityName, sessionId, items, false);
+			assertEquals(200, response.getStatus());
+
+			Cart cart = (Cart) response.getEntity();
+			assertEquals(expectedFileCount, cart.getFileCount());
+			assertEquals(expectedFileSize, cart.getFileSize());
+			assertEquals(1, cart.getCartItems().size());
+	
+			CartItem datafileCartItem = cart.getCartItems().get(0);
+			assertEquals(EntityType.datafile, datafileCartItem.getEntityType());
+			assertEquals(expectedFileCount, datafileCartItem.getFileCount());
+			assertEquals(expectedFileSize, datafileCartItem.getFileSize());
+			List<ParentEntity> parentEntities = datafileCartItem.getParentEntities();
+			assertEquals(2, parentEntities.size());
+
+			// Add the parents of an existing item
+			List<String> parentItems = new ArrayList<>();
+			for (ParentEntity parentEntity : parentEntities) {
+				Long entityId = parentEntity.getEntityId();
+				String entityType = parentEntity.getEntityType().toString();
+				parentItems.add(entityType + " " + entityId);
+				if (entityType == "investigation") {
+					Investigation investigation = icatClient.getInvestigations(Set.of(entityId)).get(0);
+					expectedFileCount = investigation.getFileCount();
+					expectedFileSize = investigation.getFileSize();
+				}
+			}
+			String parentItemsString = String.join(",", parentItems);
+			response = userResource.addCartItems(facilityName, sessionId, parentItemsString, false);
+			assertEquals(200, response.getStatus());
+			cart = (Cart) response.getEntity();
+			assertEquals(expectedFileCount, cart.getFileCount());
+			assertEquals(expectedFileSize, cart.getFileSize());
+			assertEquals(1, cart.getCartItems().size());
+
+			CartItem investigationCartItem = cart.getCartItems().get(0);
+			assertEquals(EntityType.investigation, investigationCartItem.getEntityType());
+			assertEquals(expectedFileCount, investigationCartItem.getFileCount());
+			assertEquals(expectedFileSize, investigationCartItem.getFileSize());
+
+			// Try adding the original child again - should have no effect
+			response = userResource.addCartItems(facilityName, sessionId, items, false);
+			assertEquals(200, response.getStatus());
+			cart = (Cart) response.getEntity();
+			assertEquals(expectedFileCount, cart.getFileCount());
+			assertEquals(expectedFileSize, cart.getFileSize());
+			assertEquals(1, cart.getCartItems().size());
+
+			investigationCartItem = cart.getCartItems().get(0);
+			assertEquals(EntityType.investigation, investigationCartItem.getEntityType());
+			assertEquals(expectedFileCount, investigationCartItem.getFileCount());
+			assertEquals(expectedFileSize, investigationCartItem.getFileSize());
+
+			// Remove the parents to get an empty cart
+			response = userResource.addCartItems(facilityName, sessionId, parentItemsString, true);
+			assertEquals(200, response.getStatus());
+			String emptyCart = response.getEntity().toString();
+			assertEquals("{\"facilityName\":\"LILS\",\"userName\":\"simple/root\",\"cartItems\":[]}", emptyCart);
+		} finally {
+			cartRepository.removeCart(facilityName, adminUserName);
+		}
+	}
+
+	@Test
+	public void testOldCartAddCartItems() throws MalformedURLException, TopcatException, ParseException {
+		try {
+			IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+			JsonObject source = icatClient.getEntity("datafile");
+			List<Datafile> datafiles = icatClient.getDatafiles(Set.of(source.getJsonNumber("id").longValueExact()));
+			Datafile datafile = datafiles.get(0);
+			long expectedFileCount = 1L;
+			long expectedFileSize = datafile.getFileSize();
+
+			// Create a cart with count/size set to 0 to mimic old behaviour
+			cartRepository.removeCart(facilityName, adminUserName);
+			Cart cart = new Cart(facilityName, adminUserName);
+			CartItem cartItem = new CartItem(datafile, cart);
+			cartItem.addParent(new ParentEntity(EntityType.dataset, datafile.getDatasetId(), cartItem));
+			cartItem.addParent(new ParentEntity(EntityType.investigation, datafile.getInvestigationId(), cartItem));
+			cartItem.setFileCount(0L);
+			cartItem.setFileSize(0L);
+			cart.addCartItem(cartItem);
+			cartRepository.createCart(cart);
+
+			// Item is already in the cart, but the count/size should be initialised
+			String items = "datafile " + datafile.getId();
+			Response response = userResource.addCartItems(facilityName, sessionId, items, false);
+			assertEquals(200, response.getStatus());
+
+			cart = (Cart) response.getEntity();
+			assertEquals(expectedFileCount, cart.getFileCount());
+			assertEquals(expectedFileSize, cart.getFileSize());
+			assertEquals(1, cart.getCartItems().size());
+	
+			CartItem datafileCartItem = cart.getCartItems().get(0);
+			assertEquals(EntityType.datafile, datafileCartItem.getEntityType());
+			assertEquals(expectedFileCount, datafileCartItem.getFileCount());
+			assertEquals(expectedFileSize, datafileCartItem.getFileSize());
+			List<ParentEntity> parentEntities = datafileCartItem.getParentEntities();
+			assertEquals(2, parentEntities.size());
+		} finally {
+			cartRepository.removeCart(facilityName, adminUserName);
+		}
+	}
+
+	@Test
+	public void testAddCartItemsFileCountExceeded() throws MalformedURLException, TopcatException, ParseException {
+		try {
+			cartRepository.removeCart(facilityName, adminUserName);  // Ensure there's no existing cart
+			MockProperties props = new MockProperties();
+			props.setMockProperty("facility.list", "LILS");
+			props.setMockProperty("facility.LILS.icatUrl", "https://localhost:8181");
+			props.setMockProperty("facility.LILS.idsUrl", "https://localhost:8181");
+			props.setMockProperty("facility.LILS.limit.count", "-1");
+			FacilityMap facilityMap = new FacilityMap(props);
+			FacilityMap.setInstance(facilityMap);
+
+			// Add an item
+			IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+			JsonObject datafile = icatClient.getEntity("datafile");
+			String items = "datafile " + datafile.getJsonNumber("id").longValueExact();	
+			Executable runnable = () -> userResource.addCartItems(facilityName, sessionId, items, false);
+			assertThrows(BadRequestException.class, runnable);
+		} finally {
+			cartRepository.removeCart(facilityName, adminUserName);
+			FacilityMap.setInstance(null);
+		}
+	}
+
+	@Test
+	public void testAddCartItemsFileSizeExceeded() throws MalformedURLException, TopcatException, ParseException {
+		try {
+			cartRepository.removeCart(facilityName, adminUserName);  // Ensure there's no existing cart
+			MockProperties props = new MockProperties();
+			props.setMockProperty("facility.list", "LILS");
+			props.setMockProperty("facility.LILS.icatUrl", "https://localhost:8181");
+			props.setMockProperty("facility.LILS.idsUrl", "https://localhost:8181");
+			props.setMockProperty("facility.LILS.limit.size", "-1");
+			FacilityMap facilityMap = new FacilityMap(props);
+			FacilityMap.setInstance(facilityMap);
+
+			// Add an item
+			IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
+			JsonObject datafile = icatClient.getEntity("datafile");
+			String items = "datafile " + datafile.getJsonNumber("id").longValueExact();	
+			Executable runnable = () -> userResource.addCartItems(facilityName, sessionId, items, false);
+			assertThrows(BadRequestException.class, runnable);
+		} finally {
+			cartRepository.removeCart(facilityName, adminUserName);
+			FacilityMap.setInstance(null);
+		}
 	}
 
 	@Test
@@ -361,82 +533,61 @@ public class UserResourceTest {
 
 	private void submitCartFailure(String entityType, String field) throws Exception {
 		String facilityName = "LILS";
-		HttpClient httpClient = new HttpClient("https://localhost:8181/icat");
 		IcatClient icatClient = new IcatClient("https://localhost:8181", sessionId);
 		JsonObject jsonObject = icatClient.getEntity(entityType);
 		long entityId = jsonObject.getJsonNumber("id").longValueExact();
 		String cartItemString = entityType.toLowerCase() + " " + entityId;
-
-		if (field != null) {
-			JsonObjectBuilder fieldBuilder = Json.createObjectBuilder();
-			JsonObjectBuilder entityBuilder = Json.createObjectBuilder();
-			JsonArrayBuilder entitiesBuilder = Json.createArrayBuilder();
-
-			fieldBuilder.add("id", entityId);
-			fieldBuilder.add(field, 1);
-			entityBuilder.add(entityType, fieldBuilder);
-			entitiesBuilder.add(entityBuilder);
-
-			String data = "sessionId=" + sessionId + "&entities=" + entitiesBuilder.build();
-			httpClient.post("entityManager", new HashMap<>(), data);
-		}
 		try {
-			Response cartItems = userResource.addCartItems(facilityName, sessionId, cartItemString, false);
+			userResource.addCartItems(facilityName, sessionId, cartItemString, false);
+			MockProperties props = new MockProperties();
+			props.setMockProperty("facility.list", "LILS");
+			props.setMockProperty("facility.LILS.icatUrl", "https://localhost:8181");
+			props.setMockProperty("facility.LILS.idsUrl", "https://localhost:8181");
+			props.setMockProperty("facility.LILS.limit." + field, "-1");
+			FacilityMap facilityMap = new FacilityMap(props);
+			FacilityMap.setInstance(facilityMap);
 			Executable runnable = () -> userResource.submitCart(facilityName, sessionId, "http", "", "fileName", null);
 			assertThrows(BadRequestException.class, runnable);
 		} finally {
 			userResource.deleteCartItems(facilityName, sessionId, cartItemString);
-
-			if (field != null) {
-				JsonArrayBuilder entitiesBuilder = Json.createArrayBuilder();
-				JsonObjectBuilder fieldBuilder = Json.createObjectBuilder();
-				JsonObjectBuilder entityBuilder = Json.createObjectBuilder();
-
-				fieldBuilder.add("id", entityId);
-				fieldBuilder.add(field, 0);
-				entityBuilder.add(entityType, fieldBuilder);
-				entitiesBuilder.add(entityBuilder);
-
-				String data = "sessionId=" + sessionId + "&entities=" + entitiesBuilder.build();
-				httpClient.post("entityManager", new HashMap<>(), data);
-			}
+			FacilityMap.setInstance(null);
 		}
 	}
 
 	@Test
 	public void testSubmitCartInvestigationCountFailure() throws Exception {
 		System.out.println("DEBUG testSubmitCartInvestigationCountFailure");
-		submitCartFailure("Investigation", "fileCount");
+		submitCartFailure("Investigation", "count");
 	}
 
 	@Test
 	public void testSubmitCartInvestigationSizeFailure() throws Exception {
 		System.out.println("DEBUG testSubmitCartInvestigationSizeFailure");
-		submitCartFailure("Investigation", "fileSize");
+		submitCartFailure("Investigation", "size");
 	}
 
 	@Test
 	public void testSubmitCartDatasetCountFailure() throws Exception {
 		System.out.println("DEBUG testSubmitCartDatasetCountFailure");
-		submitCartFailure("Dataset", "fileCount");
+		submitCartFailure("Dataset", "count");
 	}
 
 	@Test
 	public void testSubmitCartDatasetSizeFailure() throws Exception {
 		System.out.println("DEBUG testSubmitCartDatasetSizeFailure");
-		submitCartFailure("Dataset", "fileSize");
+		submitCartFailure("Dataset", "size");
 	}
 
 	@Test
 	public void testSubmitCartDatafileCountFailure() throws Exception {
 		System.out.println("DEBUG testSubmitCartDatafileCountFailure");
-		submitCartFailure("Datafile", null);
+		submitCartFailure("Datafile", "count");
 	}
 
 	@Test
 	public void testSubmitCartDatafileSizeFailure() throws Exception {
 		System.out.println("DEBUG testSubmitCartDatafileSizeFailure");
-		submitCartFailure("Datafile", "fileSize");
+		submitCartFailure("Datafile", "size");
 	}
 
 	@Test

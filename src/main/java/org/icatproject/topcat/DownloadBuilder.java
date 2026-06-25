@@ -244,7 +244,7 @@ public class DownloadBuilder {
 			fileName = facilityName + "_files";
 		}
 	
-		DatafilesResponse response = icatClient.getDatafiles(files);
+		DatafilesResponse response = icatClient.getDatafilesFromLocation(files);
 		if (response.ids.size() == 0) {
 			throw new NotFoundException("No Datafiles found");
 		}

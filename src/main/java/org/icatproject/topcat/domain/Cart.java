@@ -2,6 +2,7 @@ package org.icatproject.topcat.domain;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
@@ -24,6 +25,9 @@ import jakarta.persistence.UniqueConstraint;
 import jakarta.xml.bind.annotation.XmlRootElement;
 
 import org.eclipse.persistence.annotations.CascadeOnDelete;
+import org.icatproject.topcat.FacilityMap;
+import org.icatproject.topcat.exceptions.BadRequestException;
+import org.icatproject.topcat.exceptions.TopcatException;
 
 @Entity
 @Table(
@@ -50,6 +54,12 @@ public class Cart implements Serializable {
     @Column(name = "USER_NAME", nullable = false)
     private String userName;
 
+    @Column(name = "FILE_COUNT", nullable=false)
+    private long fileCount;
+
+    @Column(name = "FILE_SIZE", nullable=false)
+    private long fileSize;
+
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "cart", orphanRemoval = true)
     private List<CartItem> cartItems = new ArrayList<CartItem>();
 
@@ -64,6 +74,17 @@ public class Cart implements Serializable {
 
     public Cart() {
 
+    }
+
+    /**
+     * Construct a new Cart with the specified parameters.
+     * 
+     * @param facilityName ICAT Facility.name to which the cart belongs
+     * @param userName     ICAT User.name to whom the cart belongs
+     */
+    public Cart(String facilityName, String userName) {
+        this.facilityName = facilityName;
+        this.userName = userName;
     }
 
     public Long getId() {
@@ -88,6 +109,22 @@ public class Cart implements Serializable {
 
     public void setUserName(String userName) {
         this.userName = userName;
+    }
+
+    public long getFileCount() {
+        return fileCount;
+    }
+
+    public void setFileCount(long count) {
+        this.fileCount = count;
+    }
+
+    public long getFileSize() {
+        return fileSize;
+    }
+
+    public void setFileSize(long size) {
+        this.fileSize = size;
     }
 
     public Date getCreatedAt() {
@@ -122,6 +159,71 @@ public class Cart implements Serializable {
 
     public void setCartItems(List<CartItem> cartItems) {
         this.cartItems = cartItems;
+    }
+
+    /**
+     * @param increment amount to increase the cart's fileCount by
+     * @throws TopcatException if countLimit set and exceeded by incrementing
+     */
+    public void incrementFileCount(long increment) throws TopcatException {
+        fileCount += increment;
+        Long countLimit = FacilityMap.getInstance().getCountLimit(facilityName);
+        if (countLimit != null && fileCount > countLimit) {
+            throw new BadRequestException("Unable to add items to cart: number of files exceeds limit");
+        }
+    }
+
+    /**
+     * @param increment amount to increase the cart's fileSize by
+     * @throws TopcatException if sizeLimit set and exceeded by incrementing
+     */
+    public void incrementFileSize(long increment) throws TopcatException {
+        fileSize += increment;
+        Long sizeLimit = FacilityMap.getInstance().getSizeLimit(facilityName);
+        if (sizeLimit != null && fileSize > sizeLimit) {
+            throw new BadRequestException("Unable to add items to cart: size of files exceeds limit");
+        }
+    }
+
+    /**
+     * Decrement fileCount/fileSize by that of cartItem.
+     * 
+     * @param cartItem CartItem being removed from the Cart
+     */
+    public void decrementFileCountSize(CartItem cartItem) {
+        fileCount -= cartItem.getFileCount();
+        fileSize -= cartItem.getFileSize();
+    }
+
+    /**
+     * Add cartItem to the cart and increment fileCount/fileSize.
+     * 
+     * @param cartItem CartItem being added to the Cart
+     * @throws TopcatException if countLimit/sizeLimit are set and exceeded
+     */
+    public void addCartItem(CartItem cartItem) throws TopcatException {
+        cartItems.add(cartItem);
+        incrementFileCount(cartItem.getFileCount());
+        incrementFileSize(cartItem.getFileSize());
+    }
+
+    /**
+     * Removes a CartItem and decrement fileCount/fileSize.
+     * 
+     * @param cartItem CartItem to be removed from the cart
+     */
+    public void removeCartItem(CartItem cartItem) {
+        cartItems.remove(cartItem);
+        decrementFileCountSize(cartItem);
+    }
+
+    /**
+     * Removes a Collection of CartItems without changing fileCount/fileSize.
+     * 
+     * @param cartItems Collection of CartItems to be removed from the cart
+     */
+    public void removeCartItems(Collection<CartItem> cartItems) {
+        this.cartItems.removeAll(cartItems);
     }
 
     public String toString() {
