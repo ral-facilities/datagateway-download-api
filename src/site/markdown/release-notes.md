@@ -1,5 +1,13 @@
 # Release Notes
 
+## 3.3.0 (3 August 2026)
+
+  * Add configuration option to use the QUEUED state for Downloads submitted via the Cart.
+  * Implement endpoints to get the the size of a visit or list of files, and include size as part of the search results.
+  * Fix admin script failing to load idsUrl from DataGateway frontend settings.
+  * Fix undefined mail server settings from causing Exceptions in AdminResource, StatusCheck by using lookup instead of Resource injection.
+  * Fix Downloads showing as 0 size for one level systems by populating size on Cart submission.
+
 ## 3.2.0 (10th November 2025)
 
   * Catch exceptions in CacheRepository.prune()
