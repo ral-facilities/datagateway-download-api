@@ -773,35 +773,33 @@ public class UserResource {
 			FacilityMap facilityMap = FacilityMap.getInstance();
 			Long countLimit = facilityMap.getCountLimit(facilityName);
 			Long sizeLimit = facilityMap.getSizeLimit(facilityName);
-			if (countLimit != null || sizeLimit != null) {
-				List<Long> investigationIds = new ArrayList<>();
-				List<Long> datasetIds = new ArrayList<>();
-				List<Long> datafileIds = new ArrayList<>();
-				for (CartItem cartItem : cart.getCartItems()) {
-					switch (cartItem.getEntityType()) {
-						case investigation:
-							investigationIds.add(cartItem.getEntityId());
-							continue;
-						case dataset:
-							datasetIds.add(cartItem.getEntityId());
-							continue;
-						case datafile:
-							datafileIds.add(cartItem.getEntityId());
-							continue;
-						default:
-							throw new InternalException("Unrecognised entityType: " + cartItem.getEntityType());
-					}
-				}
-				IcatClient.EntityCounter entityCounter = icatClient.new EntityCounter(investigationIds, datasetIds, datafileIds);
-				if (countLimit != null && entityCounter.totalCount > countLimit) {
-					throw new BadRequestException("Unable to submit for cart for download, number of files exceeds limit");
-				}
-				if (sizeLimit != null && entityCounter.totalSize > sizeLimit) {
-					throw new BadRequestException("Unable to submit for cart for download, size of files exceeds limit");
+			List<Long> investigationIds = new ArrayList<>();
+			List<Long> datasetIds = new ArrayList<>();
+			List<Long> datafileIds = new ArrayList<>();
+			for (CartItem cartItem : cart.getCartItems()) {
+				switch (cartItem.getEntityType()) {
+					case investigation:
+						investigationIds.add(cartItem.getEntityId());
+						continue;
+					case dataset:
+						datasetIds.add(cartItem.getEntityId());
+						continue;
+					case datafile:
+						datafileIds.add(cartItem.getEntityId());
+						continue;
+					default:
+						throw new InternalException("Unrecognised entityType: " + cartItem.getEntityType());
 				}
 			}
+			IcatClient.EntityCounter entityCounter = icatClient.new EntityCounter(investigationIds, datasetIds, datafileIds);
+			if (countLimit != null && entityCounter.totalCount > countLimit) {
+				throw new BadRequestException("Unable to submit for cart for download, number of files exceeds limit");
+			}
+			if (sizeLimit != null && entityCounter.totalSize > sizeLimit) {
+				throw new BadRequestException("Unable to submit for cart for download, size of files exceeds limit");
+			}
 			Download download = createDownload(sessionId, cart.getFacilityName(), fileName, cart.getUserName(),
-					fullName, transport, email);
+					fullName, transport, email, entityCounter.totalSize);
 			List<DownloadItem> downloadItems = new ArrayList<DownloadItem>();
 			for (CartItem cartItem : cart.getCartItems()) {
 				DownloadItem downloadItem = createDownloadItem(download, cartItem.getEntityId(),
@@ -841,10 +839,11 @@ public class UserResource {
 	 * @param fullName     ICAT User.fullName
 	 * @param transport    Transport mechanism to use
 	 * @param email        Optional email to send notification to on completion
+	 * @param size         Total size of the Download in bytes
 	 * @return Download object with basic fields set
 	 */
 	private static Download createDownload(String sessionId, String facilityName, String fileName, String userName,
-			String fullName, String transport, String email) {
+			String fullName, String transport, String email, long size) {
 		Download download = new Download();
 		download.setSessionId(sessionId);
 		download.setFacilityName(facilityName);
@@ -854,7 +853,7 @@ public class UserResource {
 		download.setTransport(transport);
 		download.setEmail(email);
 		download.setIsEmailSent(false);
-		download.setSize(0);
+		download.setSize(size);
 		return download;
 	}
 
