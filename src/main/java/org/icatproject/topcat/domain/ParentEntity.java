@@ -41,6 +41,19 @@ public class ParentEntity implements Serializable{
     public ParentEntity() {
     }
 
+    /**
+     * Construct a ParentEntity for an existing cartItem.
+     * 
+     * @param entityType Enum of either investigation, dataset or datafile
+     * @param entityId   ICAT entity id
+     * @param cartItem   CartItem of which this is parent
+     */
+    public ParentEntity(EntityType entityType, Long entityId, CartItem cartItem) {
+        this.entityType = entityType;
+        this.entityId = entityId;
+        this.cartItem = cartItem;
+    }
+
     public Long getId() {
         return id;
     }

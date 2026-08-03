@@ -21,6 +21,8 @@ import jakarta.persistence.Table;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import jakarta.xml.bind.annotation.XmlTransient;
 
+import org.icatproject.topcat.icatEntities.IcatEntity;
+
 @Entity
 @Table(name = "CARTITEM")
 @XmlRootElement
@@ -41,6 +43,12 @@ public class CartItem implements Serializable {
     @Column(name = "NAME", nullable = true)
     private String name;
 
+    @Column(name = "FILE_COUNT", nullable=false)
+    private long fileCount;
+
+    @Column(name = "FILE_SIZE", nullable=false)
+    private long fileSize;
+
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "cartItem", orphanRemoval = true)
     private List<ParentEntity> parentEntities = new ArrayList<ParentEntity>();
 
@@ -51,9 +59,20 @@ public class CartItem implements Serializable {
     public CartItem() {
     }
 
-    public CartItem(EntityType entityType, Long entityId) {
-        this.entityType = entityType;
-        this.entityId = entityId;
+    /**
+     * Construct a new CartItem for an ICAT entity and existing cart.
+     * 
+     * @param entity Representation of an ICAT Investigation, Dataset or Datafile with
+     *               common fields defined
+     * @param cart   Cart entity to which this CartItem belongs
+     */
+    public CartItem(IcatEntity entity, Cart cart) {
+        this.entityType = EntityType.valueOf(entity.getClass().getSimpleName().toLowerCase());
+        this.entityId = entity.getId();
+        this.name = entity.getName();
+        this.fileCount = entity.getFileCount();
+        this.fileSize = entity.getFileSize();
+        this.cart = cart;
     }
 
     public Long getId() {
@@ -84,6 +103,22 @@ public class CartItem implements Serializable {
         this.name = name;
     }
 
+    public long getFileCount() {
+        return fileCount;
+    }
+
+    public void setFileCount(long count) {
+        this.fileCount = count;
+    }
+
+    public long getFileSize() {
+        return fileSize;
+    }
+
+    public void setFileSize(long size) {
+        this.fileSize = size;
+    }
+
     public void setEntityId(Long entityId) {
         this.entityId = entityId;
     }
@@ -106,4 +141,11 @@ public class CartItem implements Serializable {
         this.cart = cart;
     }
 
+    public void addParent(ParentEntity parentEntity) {
+        parentEntities.add(parentEntity);
+    }
+
+    public String toString() {
+        return "entityType: " + entityType + " entityId: " + entityId + " fileCount: " + fileCount + " fileSize: " + fileSize;
+    }
 }
