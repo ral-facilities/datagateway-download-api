@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+
 import jakarta.ejb.EJB;
 import jakarta.ejb.Lock;
 import jakarta.ejb.LockType;
@@ -59,9 +62,6 @@ public class StatusCheck {
 
   @EJB
   private DownloadRepository downloadRepository;
-
-  @Resource(name = "mail/topcat")
-  private Session mailSession;
 
   /**
    * poll thread will be WRITE locked, which is the default behaviour for Singletons
@@ -215,7 +215,7 @@ public class StatusCheck {
     String downloadUrl = getDownloadUrl(download.getFacilityName(),download.getTransport());
     downloadUrl += "/ids/getData?preparedId=" + download.getPreparedId();
     downloadUrl += "&outname=" + download.getFileName();
-    sendDownloadReadyEmail(mailSession, download, downloadUrl, null);
+    sendDownloadReadyEmail(download, downloadUrl, null);
   }
 
   /**
@@ -226,7 +226,7 @@ public class StatusCheck {
    * @param downloadUrl URL that provides the recipient access to their data
    * @param customValue Custom value to substitute into the message body, set by Pollcat
    */
-  public static void sendDownloadReadyEmail(Session mailSession, Download download, String downloadUrl, String customValue) {
+  public static void sendDownloadReadyEmail(Download download, String downloadUrl, String customValue) {
     EmailValidator emailValidator = EmailValidator.getInstance();
     Properties properties = Properties.getInstance();
 
@@ -255,8 +255,10 @@ public class StatusCheck {
         String body = sub.replace(properties.getProperty(bodyProperty, bodyProperty + " not set in run.properties"));
 
 
-        Message message = new MimeMessage(mailSession);
         try {
+          InitialContext initialContext = new InitialContext();
+          Session mailSession = (Session) initialContext.lookup("mail/topcat");
+          Message message = new MimeMessage(mailSession);
           message.setSubject(subject);
           message.setText(body);
           message.setRecipients(RecipientType.TO, InternetAddress.parse(download.getEmail()));
@@ -266,6 +268,8 @@ public class StatusCheck {
           logger.debug("Email sent to " + download.getEmail());
         } catch (MessagingException e) {
           logger.debug(e.getMessage());
+        } catch (NamingException e) {
+          logger.error("Mail session lookup failed for '/mail/topcat': ensure mail properties set in setup.properties");
         }
 
       } else {

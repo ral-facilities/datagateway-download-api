@@ -8,11 +8,9 @@ import java.util.Map;
 import java.util.Date;
 import java.text.ParseException;
 
-import jakarta.annotation.Resource;
 import jakarta.ejb.EJB;
 import jakarta.ejb.LocalBean;
 import jakarta.ejb.Stateless;
-import jakarta.mail.Session;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.PUT;
@@ -61,9 +59,6 @@ public class AdminResource {
 
 	@EJB
 	private CacheRepository cacheRepository;
-
-    @Resource(name = "mail/topcat")
-    private Session mailSession;
 
     /**
      * Returns whether or not the session provided has admin access - i.e. can use this "v1/admin/* api."
@@ -199,7 +194,7 @@ public class AdminResource {
         if(downloadStatus.equals(DownloadStatus.COMPLETE)){
             download.setCompletedAt(new Date());
             if (customValue != null && !customValue.equals("")) {
-                StatusCheck.sendDownloadReadyEmail(mailSession, download, null, customValue);
+                StatusCheck.sendDownloadReadyEmail(download, null, customValue);
                 download.setIsEmailSent(true);
             }
         }
