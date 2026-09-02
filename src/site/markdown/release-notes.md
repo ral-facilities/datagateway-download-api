@@ -1,5 +1,8 @@
 # Release Notes
 
+## 3.4.0
+  * Add myData query parameter to /search/files to allow users to search data not directly associated with them.
+
 ## 3.3.0 (3 August 2026)
 
   * Add configuration option to use the QUEUED state for Downloads submitted via the Cart.

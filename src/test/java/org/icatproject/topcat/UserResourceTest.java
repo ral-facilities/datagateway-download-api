@@ -584,7 +584,8 @@ public class UserResourceTest {
 	@Test
 	public void testSearchFiles() throws Exception {
 		System.out.println("DEBUG testSearchFiles");
-		Response response = userResource.searchFiles(null, sessionId, 100, "visitId:\"Proposal 0 - 0 0\"", null);
+		// myData = null should by treated as false for an admin user
+		Response response = userResource.searchFiles(null, sessionId, 100, "visitId:\"Proposal 0 - 0 0\"", null, null);
 		assertEquals(200, response.getStatus());
 		JsonObject responseObject = Utils.parseJsonObject(response.getEntity().toString());
 		JsonArray results = responseObject.getJsonArray("results");
@@ -604,7 +605,7 @@ public class UserResourceTest {
 		assertEquals(firstScore, firstSearchAfterObject.getJsonNumber("score").doubleValue());
 
 		// If maxResults is not provided, it will default to 0 and then should use the queue.maxFileCount value of 3
-		response = userResource.searchFiles(null, sessionId, 0, "+visitId:\"Proposal 0 - 0 0\"", firstSearchAfter);
+		response = userResource.searchFiles(null, sessionId, 0, "+visitId:\"Proposal 0 - 0 0\"", false, firstSearchAfter);
 		assertEquals(200, response.getStatus());
 		responseObject = Utils.parseJsonObject(response.getEntity().toString());
 		results = responseObject.getJsonArray("results");
@@ -621,10 +622,51 @@ public class UserResourceTest {
 	}
 
 	@Test
-	public void testSearchFilesUnauthorized() throws Exception {
+	public void testSearchFilesAdminMyData() throws Exception {
+		System.out.println("DEBUG testSearchFilesAdminMyData");
+		// Admin user is not on any of the investigations, so should not see any results
+		Response response = userResource.searchFiles(null, sessionId, 100, "visitId:\"Proposal - 0 0\"", true, null);
+		assertEquals(200, response.getStatus());
+		JsonObject responseObject = Utils.parseJsonObject(response.getEntity().toString());
+		JsonArray results = responseObject.getJsonArray("results");
+		JsonObject searchAfter = responseObject.getJsonObject("search_after");
+		assertEquals(0, results.size());
+		assertNull(searchAfter);
+	}
+
+	@Test
+	public void testSearchFilesNonAdmin() throws Exception {
 		System.out.println("DEBUG testSearchFilesUnauthorized");
 		// This user is not on any of the investigations, so should not see any results
-		Response response = userResource.searchFiles(null, nonAdminSessionId, 100, "visitId:\"Proposal - 0 0\"", null);
+		// myData = null should by treated as true for a non-admin user
+		Response response = userResource.searchFiles(null, nonAdminSessionId, 100, "visitId:\"Proposal - 0 0\"", null, null);
+		assertEquals(200, response.getStatus());
+		JsonObject responseObject = Utils.parseJsonObject(response.getEntity().toString());
+		JsonArray results = responseObject.getJsonArray("results");
+		JsonObject searchAfter = responseObject.getJsonObject("search_after");
+		assertEquals(0, results.size());
+		assertNull(searchAfter);
+	}
+
+	@Test
+	public void testSearchFilesNonAdminMyDataTrue() throws Exception {
+		System.out.println("DEBUG testSearchFilesNonAdminMyDataTrue");
+		// This user is not on any of the investigations, so should not see any results
+		Response response = userResource.searchFiles(null, nonAdminSessionId, 100, "visitId:\"Proposal - 0 0\"", true, null);
+		assertEquals(200, response.getStatus());
+		JsonObject responseObject = Utils.parseJsonObject(response.getEntity().toString());
+		JsonArray results = responseObject.getJsonArray("results");
+		JsonObject searchAfter = responseObject.getJsonObject("search_after");
+		assertEquals(0, results.size());
+		assertNull(searchAfter);
+	}
+
+	@Test
+	public void testSearchFilesNonAdminMyDataFalse() throws Exception {
+		System.out.println("DEBUG testSearchFilesNonAdminMyDataFalse");
+		// This user is not on any of the investigations, so should not see any results
+		// Even when using icat.server to do the authz, since myData is false
+		Response response = userResource.searchFiles(null, nonAdminSessionId, 100, "visitId:\"Proposal - 0 0\"", false, null);
 		assertEquals(200, response.getStatus());
 		JsonObject responseObject = Utils.parseJsonObject(response.getEntity().toString());
 		JsonArray results = responseObject.getJsonArray("results");
@@ -636,7 +678,7 @@ public class UserResourceTest {
 	@Test
 	public void testSearchFilesMaxResultsExceeded() throws Exception {
 		System.out.println("DEBUG testSearchFilesMaxResultsExceeded");
-		Executable executable = () -> userResource.searchFiles(null, sessionId, 10001, "visitId:\"Proposal - 0 0\"", null);
+		Executable executable = () -> userResource.searchFiles(null, sessionId, 10001, "visitId:\"Proposal - 0 0\"", null, null);
 		assertThrows(BadRequestException.class, executable);
 	}
 

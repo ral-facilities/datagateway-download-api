@@ -2,6 +2,7 @@ package org.icatproject.topcat.web.rest;
 
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
+import java.net.URLEncoder;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -1110,6 +1111,8 @@ public class UserResource {
 	 *                     more matching Datafiles, these should be requested separately
 	 *                     using searchAfter.
 	 * @param query        Query using Lucene syntax and supported Datafile fields.
+	 * @param myData       Whether or not to limit the search to data the user is
+	 *                     directly associated with.
 	 * @param searchAfter  Optionally ignore initial results and return those after the
 	 *                     Datafile represented by this object. For use when
 	 *                     batching/paginating results.
@@ -1122,7 +1125,8 @@ public class UserResource {
 	@Path("/search/files")
 	public Response searchFiles(@QueryParam("facilityName") String facilityName,
 			@QueryParam("sessionId") String sessionId, @QueryParam("maxResults") int maxResults,
-			@FormParam("query") String query, @FormParam("searchAfter") String searchAfter) throws Exception {
+			@FormParam("query") String query, @FormParam("myData") Boolean myData,
+			@FormParam("searchAfter") String searchAfter) throws Exception {
 
 		if (!queryEnabled) {
 			throw new BadRequestException("Querying not enabled");
@@ -1130,6 +1134,7 @@ public class UserResource {
 		FacilityMap facilityMap = FacilityMap.getInstance();
 		facilityName = facilityMap.validateFacilityName(facilityName);
 		String icatUrl = facilityMap.getIcatUrl(facilityName);
+		HttpClient httpClient = new HttpClient(icatUrl);
 		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
 		String userName = icatClient.getUserName();
 
@@ -1148,18 +1153,27 @@ public class UserResource {
 		fieldsBuilder.add("fileSize");
 		JsonObjectBuilder queryBuilder = Json.createObjectBuilder();
 		queryBuilder.add("text", query);
-		if (!icatClient.isAdmin()) {
-			queryBuilder.add("user", userName);
-		}
-		JsonObjectBuilder bodyBuilder = Json.createObjectBuilder();
-		bodyBuilder.add("fields", fieldsBuilder);
-		bodyBuilder.add("query", queryBuilder);
-		String body = bodyBuilder.build().toString();
 
-		HttpClient httpClient = new HttpClient(icatUrl + "/icat.lucene");
-		String path = "datafile" + queryParameters;
-		String contentType = "application/json; charset=utf-8";
-		org.icatproject.topcat.httpclient.Response response = httpClient.post(path, Map.of(), body, contentType);
+		org.icatproject.topcat.httpclient.Response response;
+		if (!icatClient.isAdmin() && myData != null && !myData) {
+			// If non-admin and explicitly not requesting myData, need to go via icat.server
+			queryBuilder.add("target", "Datafile");
+			queryParameters += "&query=" + URLEncoder.encode(queryBuilder.build().toString(), "UTF8");
+			queryParameters += "&sessionId=" + sessionId;
+			response = httpClient.get("icat/search/documents" + queryParameters, Map.of());
+		} else {
+			if (!icatClient.isAdmin() || (myData != null && myData)) {
+				// Default to restricting non-admins to myData, only restrict admins to myData if explicit
+				// Compatible with behaviour before myData parameter added
+				queryBuilder.add("user", userName);
+			}
+			JsonObjectBuilder bodyBuilder = Json.createObjectBuilder();
+			bodyBuilder.add("fields", fieldsBuilder);
+			bodyBuilder.add("query", queryBuilder);
+			String body = bodyBuilder.build().toString();
+			String contentType = "application/json; charset=utf-8";
+			response = httpClient.post("icat.lucene/datafile" + queryParameters, Map.of(), body, contentType);
+		}
 
 		if (response.getCode() != 200) {
 			throw new TopcatException(response.getCode(), response.toString());
