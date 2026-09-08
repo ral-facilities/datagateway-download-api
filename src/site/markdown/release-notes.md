@@ -1,6 +1,6 @@
 # Release Notes
 
-## 3.4.0
+## 3.4.0 (8 September 2026)
   * Add myData query parameter to /search/files to allow users to search data not directly associated with them.
 
 ## 3.3.0 (3 August 2026)
