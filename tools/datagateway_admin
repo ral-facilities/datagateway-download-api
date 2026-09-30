@@ -91,27 +91,15 @@ response = requests.get(
 	params={"facilityName": facility_name, "sessionId": session_id},
 	verify=verifySsl,
 )
-ids_urls = [d["idsUrl"] for d in json.loads(response.text).values()]
+download_types = json.loads(response.text)
+ids_urls = [d["idsUrl"] for d in download_types.values()]
 
 if len(ids_urls) > 1:
 	print("Available IDS servers: ")
 	for i, ids in enumerate(ids_urls):
 		print(str(i+1) + ": " + ids)
-	try:
-		option_number = int(input("Choose a number to select that IDS server: "))
-	except ValueError:
-		# this will trigger the Invalid Input response below
-		option_number = -1
-	option_number = option_number - 1
-	if option_number not in range(len(ids_urls)):
-		print("Invalid input,  selecting default IDS")
-		ids_url = download_plugin_settings["idsUrl"]
-	else:
-		ids_url = ids_urls[option_number]
 else:
-	ids_url = download_plugin_settings["idsUrl"]
-
-print("IDS url: " + ids_url)
+	print("Default IDS server: " + download_plugin_settings["idsUrl"])
 
 def input_download_ids():
 	download_ids = input("Enter one or more space separated download id(s): ")
@@ -209,29 +197,16 @@ def expire_all_pending_downloads():
 		_expire_download(download_id=download["id"])
 
 def manage_download_types():
-	download_types = list(settingsJson["accessMethods"])
-	download_statuses = []
-	for download_type in download_types:
-		response = requests.get(topcat_url + "/user/downloadType/" + str(download_type) + "/status", params={
-				"facilityName": facility_name,
-				"sessionId": session_id
-			}, verify=verifySsl)
-		if response:
-			download_status = json.loads(response.text)
-			download_statuses.append(download_status)
-		else:
-			print("Response for '" + str(download_type) + "' not OK: " + str(response.status_code) + ", " + response.text)
-			print("Treating this download type as enabled")
-			download_statuses.append({"disabled":False,"message":""})
 	while True:
 		print("Current download type statuses:")
-		for i, download_type in enumerate(download_types):
-			report = download_type
-			if download_statuses[i]["disabled"]:
-				report += " (disabled, '" + download_statuses[i]["message"] + "')"
-			else:
-				report += " (enabled)"
-			print(str(i+1) + ": " + report)
+		global download_types
+		download_types_list = list(download_types.items())
+		for i, (download_type, status) in enumerate(download_types_list, start=1):
+			report = "(enabled)"
+			if status["disabled"]:
+				report = f"(disabled, {status['message']!r})"
+
+			print(f"{i}: {download_type} {report}")
 		print()
 		# Will a Topcat administrator ever be dumb enough to input a non-number here?
 		try:
@@ -245,8 +220,7 @@ def manage_download_types():
 			print("Invalid input")
 			# We break here rather than continue, so if correct input is impossible at least we escape
 			break
-		download_type = download_types[option_number]
-		download_status = download_statuses[option_number]
+		download_type, download_status = download_types_list[option_number]
 		if download_status["disabled"]:
 			# Note: we don't reset the message - possible option to reuse it in future?
 			response = requests.put(topcat_url + "/admin/downloadType/" + str(download_type) + "/status", data={
@@ -281,11 +255,12 @@ def manage_download_types():
 				print("Request failed: " + str(response.status_code) + ", " + response.text)
 		# Update the local copy of the download status
 		# We ASSUME the request is OK
-		download_status = json.loads(requests.get(topcat_url + "/user/downloadType/" + str(download_type) + "/status", params={
-				"facilityName": facility_name,
-				"sessionId": session_id
-			}, verify=verifySsl).text)
-		download_statuses[option_number] = download_status
+		response = requests.get(
+			url=topcat_url + "/user/downloadType/status",
+			params={"facilityName": facility_name, "sessionId": session_id},
+			verify=verifySsl,
+		)
+		download_types = json.loads(response.text)
 
 
 def queue_visit():
