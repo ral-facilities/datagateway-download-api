@@ -74,16 +74,6 @@ public class UserResource {
 	private boolean queryEnabled;
 	private int maxResults;
 	private int maxFileCount;
-	private boolean queueCarts;
-
-	/**
-	 * Only used for testing.
-	 * 
-	 * @param queueCarts
-	 */
-	public void setQueueCarts(boolean queueCarts) {
-		this.queueCarts = queueCarts;
-	}
 
 	@PersistenceContext(unitName = "topcat")
 	EntityManager em;
@@ -95,7 +85,6 @@ public class UserResource {
 		this.queryEnabled = Boolean.valueOf(properties.getProperty("search.enabled", "false"));
 		this.maxResults = Integer.valueOf(properties.getProperty("search.maxResults", "10000"));
 		this.maxFileCount = Integer.valueOf(properties.getProperty("queue.files.maxFileCount", "10000"));
-		this.queueCarts = Boolean.valueOf(properties.getProperty("queue.carts", "false"));
     }
 
 	/**
@@ -757,6 +746,13 @@ public class UserResource {
 		String userName = icatClient.getUserName();
 		PriorityMap priorityMap = PriorityMap.getInstance();
 		priorityMap.checkAnonDownloadEnabled(userName);
+		DownloadStatus downloadStatus = DownloadStatus.QUEUED;
+		int priority = icatClient.getQueuePriority(PriorityMap.EntityType.cart, userName);
+		if (priority < 0) { // Disabled
+			throw new BadRequestException("Cart submission not allowed for user");
+		} else if (priority == 0) { // Legacy behaviour, skip queue and start preparing immediately
+			downloadStatus = DownloadStatus.PREPARING;
+		}
 		TransportMap transportMap = TransportMap.getInstance();
 		transportMap.checkAllowed(facilityName, transport, userName, icatClient);
 		String cartUserName = getCartUserName(userName, sessionId);
@@ -808,13 +804,6 @@ public class UserResource {
 				downloadItems.add(downloadItem);
 			}
 			download.setDownloadItems(downloadItems);
-
-			int priority = 1;
-			DownloadStatus downloadStatus = DownloadStatus.PREPARING;
-			if (queueCarts) {
-				priority = icatClient.getQueuePriority(userName);
-				downloadStatus = DownloadStatus.QUEUED;
-			}
 			download.setPriority(priority);
 			downloadId = submitDownload(idsClient, download, downloadStatus);
 
@@ -935,6 +924,26 @@ public class UserResource {
 	}
 
 	/**
+	 * @param sessionId    ICAT sessionId corresponding to a user who may (not) be
+	 *                     able to queue Downloads.
+	 * @param facilityName ICAT Facility.name.
+	 * @param entityType   Type of entity that can be queued for Download.
+	 * @return Whether the specified user is allowed to queue entities of the
+	 *         requested type.
+	 * @throws TopcatException If facilityName not recognised.
+	 */
+	private Response queueEntityAllowed(String sessionId, String facilityName, PriorityMap.EntityType entityType)
+			throws TopcatException {
+
+		logger.info("queue allowed called for {}", entityType.toString());
+		String icatUrl = DownloadBuilder.getIcatUrl(facilityName);
+		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
+		String userName = icatClient.getUserName();
+		int queuePriority = icatClient.getQueuePriority(entityType, userName);
+		return Response.ok(queuePriority > 0).build();
+	}
+
+	/**
 	 * Queue an entire visit for download, split by Dataset into part Downloads if
 	 * needed.
 	 * 
@@ -955,13 +964,28 @@ public class UserResource {
 			@FormParam("fileName") String fileName, @FormParam("email") String email,
 			@FormParam("visitId") String visitId) throws TopcatException {
 
-		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, email, fileName, transport, facilityName);
+		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, email, fileName, transport, facilityName, PriorityMap.EntityType.visit);
 		downloadBuilder.extractVisit(visitId);
 
 		String transportUrl = getDownloadUrl(facilityName, transport);
 		IdsClient idsClient = new IdsClient(transportUrl);
 		JsonArray downloadIdArray = submitDownloads(idsClient, downloadBuilder.downloads, downloadBuilder.fileName);
 		return Response.ok(downloadIdArray).build();
+	}
+
+	/**
+	 * @param facilityName ICAT Facility.name.
+	 * @param sessionId    ICAT sessionId corresponding to a user who may (not) be
+	 *                     able to queue visits.
+	 * @return Whether the specified user is allowed to queue visits.
+	 * @throws TopcatException If facilityName not recognised.
+	 */
+	@GET
+	@Path("/queue/visit/allowed")
+	public Response queueVisitAllowed(@QueryParam("sessionId") String sessionId,
+			@QueryParam("facilityName") String facilityName) throws TopcatException {
+
+		return queueEntityAllowed(sessionId, facilityName, PriorityMap.EntityType.visit);
 	}
 
 	/**
@@ -986,7 +1010,7 @@ public class UserResource {
 			@FormParam("fileName") String fileName, @FormParam("email") String email,
 			@FormParam("dataCollectionId") Long dataCollectionId) throws TopcatException {
 
-		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, email, fileName, transport, facilityName);
+		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, email, fileName, transport, facilityName, PriorityMap.EntityType.dataCollection);
 		downloadBuilder.extractDataCollection(dataCollectionId);
 
 		String transportUrl = getDownloadUrl(downloadBuilder.facilityName, downloadBuilder.transport);
@@ -996,26 +1020,37 @@ public class UserResource {
 	}
 
 	/**
+	 * @param facilityName ICAT Facility.name.
+	 * @param sessionId    ICAT sessionId corresponding to a user who may (not) be
+	 *                     able to queue DataCollections.
+	 * @return Whether the specified user is allowed to queue DataCollections.
+	 * @throws TopcatException
+	 */
+	@GET
+	@Path("/queue/dataCollection/allowed")
+	public Response queueDataCollectionAllowed(@QueryParam("sessionId") String sessionId,
+			@QueryParam("facilityName") String facilityName) throws TopcatException {
+
+		return queueEntityAllowed(sessionId, facilityName, PriorityMap.EntityType.dataCollection);
+	}
+
+	/**
 	 * Check whether the current user is allowed to send large jobs to the queue.
+	 * 
+	 * @deprecated In favour of entity specific endpoints such as queueVisitAllowed.
 	 * 
 	 * @param facilityName ICAT Facility.name
 	 * @param sessionId    ICAT sessionId, which will identify the user
 	 * @return boolean
 	 * @throws TopcatException
 	 */
+	@Deprecated
 	@GET
 	@Path("/queue/allowed")
 	public Response queueAllowed(@QueryParam("sessionId") String sessionId,
 			@QueryParam("facilityName") String facilityName) throws TopcatException {
 
-		logger.info("queueAllowed called");
-
-		String icatUrl = DownloadBuilder.getIcatUrl(facilityName);
-		IcatClient icatClient = new IcatClient(icatUrl, sessionId);
-		String userName = icatClient.getUserName();
-		int queuePriority = icatClient.getQueuePriority(userName);
-
-		return Response.ok(queuePriority > 0).build();
+		return queueEntityAllowed(sessionId, facilityName, PriorityMap.EntityType.visit);
 	}
 
 	/**
@@ -1040,7 +1075,7 @@ public class UserResource {
 			@FormParam("fileName") String fileName, @FormParam("email") String email,
 			@FormParam("files") List<String> files) throws TopcatException, UnsupportedEncodingException {
 
-		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, email, fileName, transport, facilityName);
+		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, email, fileName, transport, facilityName, PriorityMap.EntityType.files);
 		DatafilesResponse response = downloadBuilder.extractLocations(files);
 
 		String transportUrl = getDownloadUrl(facilityName, transport);
@@ -1054,6 +1089,21 @@ public class UserResource {
 		jsonObjectBuilder.add("downloadId", downloadId);
 		jsonObjectBuilder.add("notFound", jsonArrayBuilder);
 		return Response.ok(jsonObjectBuilder.build()).build();
+	}
+
+	/**
+	 * @param facilityName ICAT Facility.name.
+	 * @param sessionId    ICAT sessionId corresponding to a user who may (not) be
+	 *                     able to queue files.
+	 * @return Whether the specified user is allowed to queue files.
+	 * @throws TopcatException If facilityName not recognised.
+	 */
+	@GET
+	@Path("/queue/files/allowed")
+	public Response queueFilesAllowed(@QueryParam("sessionId") String sessionId,
+			@QueryParam("facilityName") String facilityName) throws TopcatException {
+
+		return queueEntityAllowed(sessionId, facilityName, PriorityMap.EntityType.files);
 	}
 
 	/**
@@ -1073,7 +1123,7 @@ public class UserResource {
 			@FormParam("sessionId") String sessionId, @FormParam("visitId") String visitId)
 			throws TopcatException, UnsupportedEncodingException {
 		logger.info("Get size of {}", visitId);
-		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, facilityName);
+		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, facilityName, PriorityMap.EntityType.visit);
 		return Response.ok(downloadBuilder.getVisitSize(visitId)).build();
 	}
 
@@ -1093,7 +1143,7 @@ public class UserResource {
 	public Response getSizeFiles(@FormParam("facilityName") String facilityName,
 			@FormParam("sessionId") String sessionId, @FormParam("files") List<String> files)
 			throws TopcatException, UnsupportedEncodingException {
-		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, facilityName);
+		DownloadBuilder downloadBuilder = new DownloadBuilder(sessionId, facilityName, PriorityMap.EntityType.files);
 		logger.info("Get size of {} files", files.size());
 		DatafilesResponse response = downloadBuilder.extractLocations(files);
 		return Response.ok(response.buildSizeResponseBody()).build();

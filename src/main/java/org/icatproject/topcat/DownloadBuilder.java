@@ -47,10 +47,11 @@ public class DownloadBuilder {
 	 * 
 	 * @param sessionId    ICAT sessionId.
 	 * @param facilityName ICAT Facility.name.
+	 * @param entityType   Type of entity that can be queued for Download.
 	 * @throws TopcatException if facilityName is invalid, or queueing not allowed
 	 *                         for this sessionId.
 	 */
-	public DownloadBuilder(String sessionId, String facilityName) throws TopcatException {
+	public DownloadBuilder(String sessionId, String facilityName, PriorityMap.EntityType entityType) throws TopcatException {
 		Properties properties = Properties.getInstance();
 		queueVisitMaxPartFileCount = Long.valueOf(properties.getProperty("queue.visit.maxPartFileCount", "10000"));
 		queueFilesMaxFileCount = Long.valueOf(properties.getProperty("queue.files.maxFileCount", "10000"));
@@ -64,8 +65,8 @@ public class DownloadBuilder {
 
 		userName = icatClient.getUserName();
 		fullName = icatClient.getFullName();
-		priority = icatClient.getQueuePriority(userName);
-		icatClient.checkQueueAllowed(userName);
+		priority = icatClient.getQueuePriority(entityType, userName);
+		icatClient.checkQueueAllowed(entityType, userName);
 	}
 
 	/**
@@ -77,12 +78,13 @@ public class DownloadBuilder {
 	 *                     Download. Defaults to facilityName_visitId.
 	 * @param transport    Transport mechanism to use.
 	 * @param facilityName ICAT Facility.name.
+	 * @param entityType   Type of entity that can be queued for Download.
 	 * @throws TopcatException if facilityName is invalid, or queueing not allowed
 	 *                         for this sessionId.
 	 */
-	public DownloadBuilder(String sessionId, String email, String fileName, String transport, String facilityName)
-			throws TopcatException {
-		this(sessionId, facilityName);
+	public DownloadBuilder(String sessionId, String email, String fileName, String transport, String facilityName,
+			PriorityMap.EntityType entityType) throws TopcatException {
+		this(sessionId, facilityName, entityType);
 		this.fileName = fileName;
 		this.transport = validateTransport(transport);
 		this.email = validateEmail(transport, email);

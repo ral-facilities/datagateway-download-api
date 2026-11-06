@@ -146,11 +146,11 @@ public class IcatClientTest {
 		String principalInvestigatorCondition = "EXISTS ( SELECT o FROM InvestigationUser o WHERE o.role='PRINCIPAL_INVESTIGATOR' AND o.user=user )";
 		String investigationUserCondition = "user.investigationUsers IS NOT EMPTY";
 		String groupingCondition = "EXISTS ( SELECT o FROM UserGroup o WHERE o.grouping.name='principal_beamline_scientists' AND o.user=user )";
-		assertEquals(0, icatClient.checkUser(userName, i0Condition));
-		assertEquals(0, icatClient.checkUser(userName, instrumentScientistCondition));
-		assertEquals(0, icatClient.checkUser(userName, principalInvestigatorCondition));
-		assertEquals(0, icatClient.checkUser(userName, investigationUserCondition));
-		assertEquals(0, icatClient.checkUser(userName, groupingCondition));
+		assertFalse(icatClient.checkUser(userName, i0Condition));
+		assertFalse(icatClient.checkUser(userName, instrumentScientistCondition));
+		assertFalse(icatClient.checkUser(userName, principalInvestigatorCondition));
+		assertFalse(icatClient.checkUser(userName, investigationUserCondition));
+		assertFalse(icatClient.checkUser(userName, groupingCondition));
 	}
 
 	@Test
@@ -224,11 +224,11 @@ public class IcatClientTest {
 			String principalInvestigatorCondition = "EXISTS ( SELECT o FROM InvestigationUser o WHERE o.role='PRINCIPAL_INVESTIGATOR' AND o.user=user )";
 			String investigationUserCondition = "user.investigationUsers IS NOT EMPTY";
 			String groupingCondition = "EXISTS ( SELECT o FROM UserGroup o WHERE o.grouping.name='principal_beamline_scientists' AND o.user=user )";
-			assertEquals(1, icatClient.checkUser(userName, i0Condition));
-			assertEquals(1, icatClient.checkUser(userName, instrumentScientistCondition));
-			assertEquals(1, icatClient.checkUser(userName, principalInvestigatorCondition));
-			assertEquals(1, icatClient.checkUser(userName, investigationUserCondition));
-			assertEquals(1, icatClient.checkUser(userName, groupingCondition));
+			assertTrue(icatClient.checkUser(userName, i0Condition));
+			assertTrue(icatClient.checkUser(userName, instrumentScientistCondition));
+			assertTrue(icatClient.checkUser(userName, principalInvestigatorCondition));
+			assertTrue(icatClient.checkUser(userName, investigationUserCondition));
+			assertTrue(icatClient.checkUser(userName, groupingCondition));
 		} finally {
 			arrayBuilder = Json.createArrayBuilder();
 			instrumentScientistBuilder = Json.createObjectBuilder();
