@@ -136,12 +136,10 @@ queue.visit.maxPartFileCount = 10000
 # Any chunking should be done clientside
 queue.files.maxFileCount = 10000
 
-# If True, then submitted carts will enter the QUEUED state with an appropriate priority level.
-# Otherwise, they will start immediately (historic behaviour).
-queue.carts = False
-
 # When queueing Downloads a positive priority will allow a User to proceed.
 # Non-positive values will block that User from submitting a request to the queue.
+# Different Entities (cart, datacollection, visit, files) can be given queue priorities independently of each other.
+# A value of 0 for carts will allow legacy behaviour where submissions are not queued and start preparing immediately.
 # When automatically moving jobs from the queued to the PREPARING state, all Downloads
 # from Users with priority 1 will be scheduled before 2 and so on.
 # Specific individuals can be identified with their ICAT username, this will take precedence over all other settings
@@ -151,14 +149,32 @@ queue.carts = False
 # Authenticated Users without InstrumentScientist or InvestigationUser status will use the authenticated priority
 # Anyone who does not meet a specific priority class will use the default
 # Users meeting multiple criteria will use the highest priority available (lowest number)
-queue.priority.user = {"simple/root": 1}
-queue.priority.grouping = {"principal_beamline_scientists": 1}
-queue.priority.instrumentScientist.instruments = {"ABC": 1}
-queue.priority.instrumentScientist.default = 2
-queue.priority.investigationUser.roles = {"ABC": 3}
-queue.priority.investigationUser.default = 4
-queue.priority.authenticated = {"orcid": 6, "anon": 0}
-queue.priority.default = 5
+
+queue.priority.cart.default = 0
+queue.priority.cart.authenticated = {"orcid": 6, "anon": -1}
+
+queue.priority.visit.grouping = {"principal_beamline_scientists": 1}
+queue.priority.visit.instrumentScientist.instruments = {"ABC": 1}
+queue.priority.visit.instrumentScientist.default = 2
+queue.priority.visit.investigationUser.roles = {"ABC": 3}
+queue.priority.visit.investigationUser.default = 4
+queue.priority.visit.default = -1
+
+queue.priority.files.grouping = {"principal_beamline_scientists": 1}
+queue.priority.files.instrumentScientist.instruments = {"ABC": 1}
+queue.priority.files.instrumentScientist.default = 2
+queue.priority.files.investigationUser.roles = {"ABC": 3}
+queue.priority.files.investigationUser.default = 4
+queue.priority.files.default = -1
+
+queue.priority.dataCollection.user = {"simple/root": 1}
+queue.priority.dataCollection.grouping = {"principal_beamline_scientists": 1}
+queue.priority.dataCollection.instrumentScientist.instruments = {"ABC": 1}
+queue.priority.dataCollection.instrumentScientist.default = 2
+queue.priority.dataCollection.investigationUser.roles = {"ABC": 3}
+queue.priority.dataCollection.investigationUser.default = 4
+queue.priority.dataCollection.authenticated = {"orcid": 6, "anon": -1}
+queue.priority.dataCollection.default = 5
 
 # Whether the API endpoint perform Lucene searches is enabled
 search.enabled = false

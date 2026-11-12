@@ -262,7 +262,7 @@ public class UserResourceTest {
 		}
 		assertEquals(fileName, newDownload.getFileName());
 		assertFalse(newDownload.getIsDeleted());
-		assertEquals(1, newDownload.getPriority());
+		assertEquals(0, newDownload.getPriority());
 
 		// Next, change the download status. Must be different from the current status!
 		String downloadStatus = "EXPIRED";
@@ -320,7 +320,7 @@ public class UserResourceTest {
 			props.setMockProperty("facility.LILS.limit.size", "10000000000000");
 			FacilityMap facilityMap = new FacilityMap(props);
 			FacilityMap.setInstance(facilityMap);
-			userResource.setQueueCarts(true);
+			PriorityMap.getInstance().entityPriorities.get(PriorityMap.EntityType.cart).defaultPriority = 1;
 			String facilityName = "LILS";
 			String transport = "http";
 			String email = "";
@@ -349,10 +349,10 @@ public class UserResourceTest {
 			assertEquals("simple/root", download.getUserName());
 			assertEquals("simple/root", download.getFullName());
 			assertNull(download.getEmail());
-			assertEquals(2, download.getPriority());
+			assertEquals(1, download.getPriority());
 		} finally {
 			FacilityMap.setInstance(null);
-			userResource.setQueueCarts(false);
+			PriorityMap.instance = null;
 			if (downloadId != null) {
 				downloadRepository.removeDownload(downloadId);
 			}
@@ -774,12 +774,43 @@ public class UserResourceTest {
 		}
 	}
 
+	@Deprecated 
 	@Test
 	public void testQueueAllowed() throws Exception {
 		System.out.println("DEBUG testQueueAllowed");
 
 		String facilityName = "LILS";
 		Response response = userResource.queueAllowed(sessionId, facilityName);
+		assertEquals(200, response.getStatus());
+		assertEquals(true, response.getEntity());
+	}
+
+	@Test
+	public void testQueueVisitAllowed() throws Exception {
+		System.out.println("DEBUG testQueueVisitAllowed");
+
+		String facilityName = "LILS";
+		Response response = userResource.queueVisitAllowed(sessionId, facilityName);
+		assertEquals(200, response.getStatus());
+		assertEquals(true, response.getEntity());
+	}
+
+	@Test
+	public void testQueueFilesAllowed() throws Exception {
+		System.out.println("DEBUG testQueueFilesAllowed");
+
+		String facilityName = "LILS";
+		Response response = userResource.queueFilesAllowed(sessionId, facilityName);
+		assertEquals(200, response.getStatus());
+		assertEquals(true, response.getEntity());
+	}
+
+	@Test
+	public void testQueueDataCollectionAllowed() throws Exception {
+		System.out.println("DEBUG testQueueDataCollectionAllowed");
+
+		String facilityName = "LILS";
+		Response response = userResource.queueDataCollectionAllowed(sessionId, facilityName);
 		assertEquals(200, response.getStatus());
 		assertEquals(true, response.getEntity());
 	}
