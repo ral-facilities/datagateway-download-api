@@ -1,9 +1,10 @@
 # Release Notes
 
-## 4.0.0
+## 4.0.0 (12 November 2026)
   * Breaking change: Allow different entities (carts, visits, files and data collections) to be configured with independent priority levels. `run.properties` will need to be modified to specify which entity a priority applies to.
   * Replace boolean `queue.carts` property with a full set of cart specific priority levels, with `0` priority retaining historic behaviour.
   * Implement entity specific `/queue/{entity}/allowed` endpoints and deprecate `/queue/allowed`.
+  * Bugfix for `manage_download_types` in `datagateway_admin`.
 
 ## 3.4.0 (8 September 2026)
   * Add myData query parameter to /search/files to allow users to search data not directly associated with them.
