@@ -747,7 +747,7 @@ public class UserResourceTest {
 			assertEquals(0, download.getInvestigationIds().size());
 			assertEquals(1, download.getDatasetIds().size());
 			assertEquals(0, download.getDatafileIds().size());
-			assertEquals("LILS_DataCollection" + entityId + "_part_1_of_2", download.getFileName());
+			assertEquals("LILS_DataCollection" + entityId + "_part_1_of_2_doi", download.getFileName());
 			assertEquals(transport, download.getTransport());
 			assertEquals("simple/root", download.getUserName());
 			assertEquals("simple/root", download.getFullName());
@@ -761,7 +761,7 @@ public class UserResourceTest {
 			assertEquals(0, download.getInvestigationIds().size());
 			assertEquals(0, download.getDatasetIds().size());
 			assertEquals(1, download.getDatafileIds().size());
-			assertEquals("LILS_DataCollection" + entityId + "_part_2_of_2", download.getFileName());
+			assertEquals("LILS_DataCollection" + entityId + "_part_2_of_2_doi", download.getFileName());
 			assertEquals(transport, download.getTransport());
 			assertEquals("simple/root", download.getUserName());
 			assertEquals("simple/root", download.getFullName());

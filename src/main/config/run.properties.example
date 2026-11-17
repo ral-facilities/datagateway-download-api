@@ -127,10 +127,15 @@ queue.account.LILS.password=password
 # Negative values will start all queued jobs immediately, regardless of load.
 queue.maxActiveDownloads = 10
 
+# Optional suffix for queued dataCollection filenames, defaults to _doi
+queue.dataCollection.suffix=_doi
+
 # Limit the number files per queued Download part. Multiple Datasets will be combined into part
 # Downloads based on their fileCount up to this limit. If a single Dataset has a fileCount
 # greater than this limit, it will still be submitted in a part by itself.
 queue.visit.maxPartFileCount = 10000
+# Optional suffix for queued visit filenames, defaults to an empty string (no suffix)
+# queue.visit.suffix=
 
 # Requests to the /queue/files endpoint will be rejected if they exceed this number of files
 # Any chunking should be done clientside
