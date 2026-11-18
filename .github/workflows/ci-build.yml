@@ -117,6 +117,13 @@ jobs:
           name: ICAT logs
           path: /home/runner/logs/icat.log
 
+      - name: Upload ICAT Lucene log
+        uses: actions/upload-artifact@v7
+        if: ${{ failure() }}
+        with:
+          name: ICAT Lucene logs
+          path: /home/runner/logs/lucene.log
+
       - name: Payara logs
         uses: actions/upload-artifact@v7
         if: ${{ failure() }}
