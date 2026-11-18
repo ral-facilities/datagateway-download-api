@@ -609,7 +609,7 @@ public class UserResourceTest {
 		assertEquals(200, response.getStatus());
 		responseObject = Utils.parseJsonObject(response.getEntity().toString());
 		results = responseObject.getJsonArray("results");
-		assertEquals(3, results.size(), results.toString());
+		assertEquals(3, results.size());
 		assertTrue(responseObject.containsKey("search_after"));
 		String secondSearchAfter = responseObject.getJsonObject("search_after").toString();
 		JsonObject secondSearchAfterObject = Utils.parseJsonObject(secondSearchAfter);
