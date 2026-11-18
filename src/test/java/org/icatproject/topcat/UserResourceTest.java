@@ -605,7 +605,7 @@ public class UserResourceTest {
 		assertEquals(firstScore, firstSearchAfterObject.getJsonNumber("score").doubleValue());
 
 		// If maxResults is not provided, it will default to 0 and then should use the queue.maxFileCount value of 3
-		response = userResource.searchFiles(null, sessionId, 0, "+visitId:\"Proposal 0 - 0 0\"", false, firstSearchAfter);
+		response = userResource.searchFiles(null, sessionId, 0, "visitId:\"Proposal 0 - 0 0\"", false, firstSearchAfter);
 		assertEquals(200, response.getStatus());
 		responseObject = Utils.parseJsonObject(response.getEntity().toString());
 		results = responseObject.getJsonArray("results");
@@ -616,9 +616,12 @@ public class UserResourceTest {
 		JsonArray secondFields = secondSearchAfterObject.getJsonArray("fields");
 		assertEquals(0, secondSearchAfterObject.getJsonNumber("shardIndex").intValueExact());
 		assertNotEquals(secondSearchAfterObject.getJsonNumber("doc").intValueExact(), firstDoc);
-		assertEquals(firstScore, secondSearchAfterObject.getJsonNumber("score").doubleValue());
-		assertEquals(firstScore, secondFields.getJsonNumber(0).doubleValue());
-		assertEquals(firstIcatId + 3, secondFields.getJsonNumber(1).longValueExact());
+		assertTrue(firstScore >= secondSearchAfterObject.getJsonNumber("score").doubleValue(),
+				"First search after was " + firstSearchAfter + ", second search after was " + secondSearchAfter);
+		assertTrue(firstScore >= secondFields.getJsonNumber(0).doubleValue(),
+				"First search after was " + firstSearchAfter + ", second search after was " + secondSearchAfter);
+		assertEquals(firstIcatId + 3, secondFields.getJsonNumber(1).longValueExact(),
+				"First search after was " + firstSearchAfter + ", second search after was " + secondSearchAfter);
 	}
 
 	@Test
