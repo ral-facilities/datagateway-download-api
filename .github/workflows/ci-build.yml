@@ -43,6 +43,7 @@ jobs:
         uses: actions/checkout@cd7d8d697e10461458bc61a30d094dc601a8b017 # v4.0.0
         with:
           repository: icatproject-contrib/icat-ansible
+          ref: e02ebaeb05babac968440938d9b6477fdc309cb5
           path: icat-ansible
       - name: Install Ansible
         run: pip install -r icat-ansible/requirements.txt
