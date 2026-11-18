@@ -1232,10 +1232,12 @@ public class UserResource {
 			response = httpClient.post("icat.lucene/datafile" + queryParameters, Map.of(), body, contentType);
 		}
 
+		String responseString = response.toString();
 		if (response.getCode() != 200) {
-			throw new TopcatException(response.getCode(), response.toString());
+			throw new TopcatException(response.getCode(), responseString);
 		}
-		return Response.ok(response.toString()).build();
+		System.out.println(responseString);  // TODO RM DEBUGGING
+		return Response.ok(responseString).build();
 	}
 
 	/**
