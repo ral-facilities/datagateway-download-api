@@ -74,6 +74,8 @@ public class UserResource {
 	private boolean queryEnabled;
 	private int maxResults;
 	private int maxFileCount;
+	private String queueDataCollectionSuffix;
+	private String queueVisitSuffix;
 
 	@PersistenceContext(unitName = "topcat")
 	EntityManager em;
@@ -85,6 +87,8 @@ public class UserResource {
 		this.queryEnabled = Boolean.valueOf(properties.getProperty("search.enabled", "false"));
 		this.maxResults = Integer.valueOf(properties.getProperty("search.maxResults", "10000"));
 		this.maxFileCount = Integer.valueOf(properties.getProperty("queue.files.maxFileCount", "10000"));
+		this.queueDataCollectionSuffix = properties.getProperty("queue.dataCollection.suffix", "_doi");
+		this.queueVisitSuffix = properties.getProperty("queue.visit.suffix", "");
     }
 
 	/**
@@ -869,15 +873,16 @@ public class UserResource {
 	 * @param idsClient Client for the IDS to use for the Download
 	 * @param downloads Downloads to submit
 	 * @param fileName  Base fileName which will be extended for each individual Download
+	 * @param suffix    Optional suffix for the filename.
 	 * @return JsonArray of the new Download ids
 	 * @throws TopcatException if unable to submit one of the Downloads
 	 */
-	private JsonArray submitDownloads(IdsClient idsClient, List<Download> downloads, String fileName) throws TopcatException {
+	private JsonArray submitDownloads(IdsClient idsClient, List<Download> downloads, String fileName, String suffix) throws TopcatException {
 		long downloadId;
 		JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
 		int part = 1;
 		for (Download download : downloads) {
-			String partFilename = formatQueuedFilename(fileName, part, downloads.size());
+			String partFilename = formatQueuedFilename(fileName, part, downloads.size(), suffix);
 			download.setFileName(partFilename);
 			downloadId = submitDownload(idsClient, download, DownloadStatus.QUEUED);
 			jsonArrayBuilder.add(downloadId);
@@ -969,7 +974,8 @@ public class UserResource {
 
 		String transportUrl = getDownloadUrl(facilityName, transport);
 		IdsClient idsClient = new IdsClient(transportUrl);
-		JsonArray downloadIdArray = submitDownloads(idsClient, downloadBuilder.downloads, downloadBuilder.fileName);
+		JsonArray downloadIdArray = submitDownloads(idsClient, downloadBuilder.downloads, downloadBuilder.fileName,
+				queueVisitSuffix);
 		return Response.ok(downloadIdArray).build();
 	}
 
@@ -1015,7 +1021,8 @@ public class UserResource {
 
 		String transportUrl = getDownloadUrl(downloadBuilder.facilityName, downloadBuilder.transport);
 		IdsClient idsClient = new IdsClient(transportUrl);
-		JsonArray downloadIdArray = submitDownloads(idsClient, downloadBuilder.downloads, downloadBuilder.fileName);
+		JsonArray downloadIdArray = submitDownloads(idsClient, downloadBuilder.downloads, downloadBuilder.fileName,
+				queueDataCollectionSuffix);
 		return Response.ok(downloadIdArray).build();
 	}
 
@@ -1237,9 +1244,10 @@ public class UserResource {
 	 * @param filename Root of the formatted filename, either user specified or defaulted.
 	 * @param part     1 indexed part of the overall request
 	 * @param size     Number of parts in the overall request
+	 * @param suffix   Optional suffix for the filename.
 	 * @return Formatted filename
 	 */
-	private static String formatQueuedFilename(String filename, int part, int size) {
+	private static String formatQueuedFilename(String filename, int part, int size, String suffix) {
 		String partString = String.valueOf(part);
 		String sizeString = String.valueOf(size);
 		StringBuilder partBuilder = new StringBuilder();
@@ -1254,6 +1262,7 @@ public class UserResource {
 		filenameBuilder.append(partBuilder);
 		filenameBuilder.append("_of_");
 		filenameBuilder.append(sizeString);
+		filenameBuilder.append(suffix);
 		return filenameBuilder.toString();
 	}
 

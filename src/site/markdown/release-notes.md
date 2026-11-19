@@ -1,5 +1,8 @@
 # Release Notes
 
+## 4.1.0
+  * Add optional suffixes for part-filenames of queued visits and data collections.
+
 ## 4.0.0 (12 November 2026)
   * Breaking change: Allow different entities (carts, visits, files and data collections) to be configured with independent priority levels. `run.properties` will need to be modified to specify which entity a priority applies to.
   * Replace boolean `queue.carts` property with a full set of cart specific priority levels, with `0` priority retaining historic behaviour.
