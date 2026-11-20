@@ -42,6 +42,11 @@ facility.LILS.limit.count = 250000
 # Maximum total volume, in bytes, that can be included in a single cart request.
 facility.LILS.limit.size = 10000000000000
 
+# Optionally delete carts that have not been updated in the last N days
+# Different limits can be set for anonymous (as defined above) and authenticated users
+# facility.LILS.maxCartAgeDays.anon=7
+# facility.LILS.maxCartAgeDays.authenticated=30
+
 # enable send email
 mail.enable=true
 
